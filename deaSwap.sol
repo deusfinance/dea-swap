@@ -66,7 +66,7 @@ contract DeaSwap is PullPayment {
 		path[1] = DEA;
         
 		uint deadline = block.timestamp + 5;
-		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(deusIn, 0, path, msg.sender, deadline);
+		uniswapRouter.swapExactTokensForTokens(deusIn, 0, path, msg.sender, deadline);
 	}
 
 	function swapDeaToEth (
@@ -111,9 +111,9 @@ contract DeaSwap is PullPayment {
 		
         path[0] = uniswapRouter.WETH();
 		path[1] = USDC;
-		uint deadline = block.timestamp + 5;
+		deadline = block.timestamp + 5;
 
-		uint[] memory amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(0, path, msg.sender, deadline);
+		amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(0, path, msg.sender, deadline);
 	}
 
 
@@ -139,8 +139,8 @@ contract DeaSwap is PullPayment {
         path[0] = DEUS;
 		path[1] = DEA;
         
-		uint deadline = block.timestamp + 5;
-		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(deusOut, 0, path, msg.sender, deadline);
+		deadline = block.timestamp + 5;
+		amounts = uniswapRouter.swapExactTokensForTokens(deusOut, 0, path, msg.sender, deadline);
 
 	}
 	
@@ -159,7 +159,7 @@ contract DeaSwap is PullPayment {
 		path[1] = USDC;
 		uint deadline = block.timestamp + 5;
 
-		uint[] memory amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(0, path, msg.sender, deadline);
+		uniswapRouter.swapExactETHForTokens{value: ethOut}(0, path, msg.sender, deadline);
 	}
 
 
