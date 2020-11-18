@@ -27,7 +27,7 @@ contract DeaSwap is PullPayment {
 	
     address DEUS = 0xf025DB474fcF9bA30844e91A54bC4747d4FC7842;
     address DEA = 0x02b7a1AF1e9c7364Dd92CdC3b09340Aea6403934;
-	address USDC = 0x02b7a1AF1e9c7364Dd92CdC3b09340Aea6403934;
+	address USDC = 0xAedAb46B9dca7EE3Ab303B088eCCB83443db24A1;
 
 	address internal constant uniswapRouterAddress = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
 	address internal constant AutomaticMarketMakerAddress = 0x6D3459E48C5D106e97FeC08284D56d43b00C2AB4;
@@ -66,7 +66,11 @@ contract DeaSwap is PullPayment {
 		path[1] = DEA;
         
 		uint deadline = block.timestamp + 5;
-		uniswapRouter.swapExactTokensForTokens(deusIn, 0, path, msg.sender, deadline);
+
+		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(deusIn, 0, path, msg.sender, deadline);
+		uint deaOut = amounts[amounts.length - 1];
+
+		EthToDea(msg.value, deaOut);
 	}
 
 	function swapDeaToEth (
@@ -88,6 +92,8 @@ contract DeaSwap is PullPayment {
         AMM.sell(deusIn, ethOut);
 		AMM.withdrawPayments(address(this));
 		(msg.sender).transfer(ethOut);
+
+		DeaToEth(deaIn, ethOut);
 	}
 
 	function swapDeaToUsdc (
@@ -114,6 +120,9 @@ contract DeaSwap is PullPayment {
 		deadline = block.timestamp + 5;
 
 		amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(0, path, msg.sender, deadline);
+		uint usdcOut = amounts[amounts.length - 1];
+
+		DeaToUsdc(deaIn, usdcOut);
 	}
 
 
@@ -141,7 +150,9 @@ contract DeaSwap is PullPayment {
         
 		deadline = block.timestamp + 5;
 		amounts = uniswapRouter.swapExactTokensForTokens(deusOut, 0, path, msg.sender, deadline);
-
+		uint deaOut = amounts[amounts.length - 1];
+		
+		UsdcToDea(usdcIn, deaOut);
 	}
 	
 	function swapDeusToUsdc (
@@ -159,7 +170,10 @@ contract DeaSwap is PullPayment {
 		path[1] = USDC;
 		uint deadline = block.timestamp + 5;
 
-		uniswapRouter.swapExactETHForTokens{value: ethOut}(0, path, msg.sender, deadline);
+		uint[] memory amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(0, path, msg.sender, deadline);
+		uint usdcOut = amounts[amounts.length - 1];
+
+		DeusToUsdc(deusIn, usdcOut);
 	}
 
 
@@ -183,6 +197,8 @@ contract DeaSwap is PullPayment {
         AMM.buy{value: ethIn}(deusOut);
 
 		IERC20(DEUS).transfer(msg.sender, deusOut);
+
+		UsdcToDeus(usdcIn, deusOut);
 	}
 
 
