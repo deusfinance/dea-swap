@@ -70,7 +70,7 @@ contract DeaSwap is PullPayment {
 		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(deusIn, 0, path, msg.sender, deadline);
 		uint deaOut = amounts[amounts.length - 1];
 
-		EthToDea(msg.value, deaOut);
+		emit EthToDea(msg.value, deaOut);
 	}
 
 	function swapDeaToEth (
@@ -93,7 +93,7 @@ contract DeaSwap is PullPayment {
 		AMM.withdrawPayments(address(this));
 		(msg.sender).transfer(ethOut);
 
-		DeaToEth(deaIn, ethOut);
+		emit DeaToEth(deaIn, ethOut);
 	}
 
 	function swapDeaToUsdc (
@@ -122,7 +122,7 @@ contract DeaSwap is PullPayment {
 		amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(0, path, msg.sender, deadline);
 		uint usdcOut = amounts[amounts.length - 1];
 
-		DeaToUsdc(deaIn, usdcOut);
+		emit DeaToUsdc(deaIn, usdcOut);
 	}
 
 
@@ -152,7 +152,7 @@ contract DeaSwap is PullPayment {
 		amounts = uniswapRouter.swapExactTokensForTokens(deusOut, 0, path, msg.sender, deadline);
 		uint deaOut = amounts[amounts.length - 1];
 		
-		UsdcToDea(usdcIn, deaOut);
+		emit UsdcToDea(usdcIn, deaOut);
 	}
 	
 	function swapDeusToUsdc (
@@ -173,7 +173,7 @@ contract DeaSwap is PullPayment {
 		uint[] memory amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(0, path, msg.sender, deadline);
 		uint usdcOut = amounts[amounts.length - 1];
 
-		DeusToUsdc(deusIn, usdcOut);
+		emit DeusToUsdc(deusIn, usdcOut);
 	}
 
 
@@ -198,7 +198,7 @@ contract DeaSwap is PullPayment {
 
 		IERC20(DEUS).transfer(msg.sender, deusOut);
 
-		UsdcToDeus(usdcIn, deusOut);
+		emit UsdcToDeus(usdcIn, deusOut);
 	}
 
 
