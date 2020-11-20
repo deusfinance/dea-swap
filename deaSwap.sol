@@ -139,7 +139,10 @@ contract DeaSwap is PullPayment {
 		path[1] = DEUS;
 		
 		uint deadline = block.timestamp + 5;
-		uniswapRouter.swapExactTokensForTokens(deaIn, 0, path, msg.sender, deadline);
+		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(deaIn, 0, path, msg.sender, deadline);
+		uint deusOut = amounts[amounts.length - 1];
+
+		emit DeaToDeus(deaIn, deusOut);
 	}
 
 
@@ -203,7 +206,10 @@ contract DeaSwap is PullPayment {
 		path[1] = DEA;
 		
 		uint deadline = block.timestamp + 5;
-		uniswapRouter.swapExactTokensForTokens(deusIn, 0, path, msg.sender, deadline);
+		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(deusIn, 0, path, msg.sender, deadline);
+		uint deaOut = amounts[amounts.length - 1];
+
+		emit DeusToDea(deusIn, deaOut);
 	}
 
 
@@ -237,20 +243,26 @@ contract DeaSwap is PullPayment {
 		path[1] = USDC;
 		uint deadline = block.timestamp + 5;
 
-		uniswapRouter.swapExactETHForTokens{value: msg.value}(0, path, msg.sender, deadline);
+		uint[] memory amounts = uniswapRouter.swapExactETHForTokens{value: msg.value}(0, path, msg.sender, deadline);
+		uint usdcOut = amounts[amounts.length - 1];
+
+		emit EthToUsdc(msg.value, usdcOut);
 	}
 
 	function swapUsdcToEth (
-		uint deaIn
+		uint usdcIn
 	) external {
-		IERC20(DEA).transferFrom(msg.sender, address(this), deaIn);
+		IERC20(DEA).transferFrom(msg.sender, address(this), usdcIn);
 
 		address[] memory path = new address[](2);
         path[0] = DEA;
 		path[1] = uniswapRouter.WETH();
 		uint deadline = block.timestamp + 5;
 
-		uniswapRouter.swapExactTokensForETH(deaIn, 0, path, msg.sender, deadline);
+		uint[] memory amounts = uniswapRouter.swapExactTokensForETH(usdcIn, 0, path, msg.sender, deadline);
+		uint ethOut = amounts[amounts.length - 1];
+
+		emit UsdcToEth(usdcIn, ethOut);
 	}
 
 
