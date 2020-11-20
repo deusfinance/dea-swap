@@ -41,6 +41,10 @@ contract DeaSwap is PullPayment {
 	event UsdcToDea(uint usdcIn, uint deaOut);
 	event DeusToUsdc(uint deusIn, uint usdcOut);
 	event UsdcToDeus(uint usdcIn, uint deusOut);
+	event DeaToDeus(uint deaIn, uint deusOut);
+	event DeusToDea(uint deusIn, uint deaOut);
+	event EthToUsdc(uint ethIn, uint usdcOut);
+	event UsdcToEth(uint usdcIn, uint ethOut);
 
 	constructor() public {
 		uniswapRouter = IUniswapV2Router02(uniswapRouterAddress);
