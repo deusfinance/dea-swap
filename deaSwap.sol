@@ -78,7 +78,6 @@ contract DeaSwap is PullPayment {
 	) external {
 		require(type >= 0 && type <= 1, "Invalid Type");
 		if(type == 0) {
-
 			uint ethOut = AMM.calculateSaleReturn(amountIn);
 
 			AMM.sell(amountIn, ethOut);
@@ -87,7 +86,6 @@ contract DeaSwap is PullPayment {
 
 			emit swap(path[path.length - 1], address(0), amountIn, ethOut);
 		} else {
-			path[path.length] = uniswapRouter.WETH();
 			uint deadline = block.timestamp + 5;
 
 			uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path, msg.sender, deadline);
@@ -105,222 +103,44 @@ contract DeaSwap is PullPayment {
 	) external {
 		require(type >= 0 && type <= 2, "Invalid Type");
 		if(type == 0) {
-			swap
-			
-		} else if (type == 1) {
-			
-		} else {
+			uint deadline = block.timestamp + 5;
 
+			uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path1, address(this), deadline);
+			uint amountOfEthOut = amounts[amounts.length - 1];
+
+			uint estimatedDeus = AMM.calculatePurchaseReturn(amountOfEthOut);
+        	AMM.buy{value: amountOfEthOut}(estimatedDeus);
+			
+			deadline = block.timestamp + 5;
+
+			amounts = uniswapRouter.swapExactTokensForTokens(estimatedDeus, 1, path2, msg.sender, deadline);
+			uint amountOfTokenOut = amounts[amounts.length - 1];
+
+			emit swap(path1[0], path2[path2.length - 1], amountIn, amountOfTokenOut);
+		} else if (type == 1) {
+			uint deadline = block.timestamp + 5;
+
+			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), deadline);
+			uint amountOfDeusOut = amounts[amounts.length - 1];
+
+			uint ethOut = AMM.calculateSaleReturn(amountOfDeusOut);
+			AMM.sell(amountIn, ethOut);
+			AMM.withdrawPayments(address(this));
+			
+			deadline = block.timestamp + 5;
+
+			amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(1, path2, msg.sender, deadline);
+			uint amountOfTokenOut = amounts[amounts.length - 1];
+
+			emit swap(path1[0], path2[path2.length - 1], amountIn, amountOfTokenOut);
+		} else {
+			uint deadline = block.timestamp + 5;
+			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), deadline);
+			uint amountOfTokenOut = amounts[amounts.length - 1];
+
+			emit swap(path1[0], path1[path1.length - 1], amountIn, amountOfTokenOut);
 		}
 	}
-
-
-	function swapEthToDea () external payable {
-        
-		uint deusIn = AMM.calculatePurchaseReturn(msg.value);
-
-        AMM.buy{value: msg.value}(deusIn);
-        
-    	address[] memory path = new address[](2);
-        path[0] = DEUS;
-		path[1] = DEA;
-        
-		uint deadline = block.timestamp + 5;
-
-		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(deusIn, 0, path, msg.sender, deadline);
-		uint deaOut = amounts[amounts.length - 1];
-
-		emit EthToDea(msg.value, deaOut);
-	}
-
-	function swapDeaToEth (
-		uint deaIn
-	) external {
-		IERC20(DEA).transferFrom(msg.sender, address(this), deaIn);
-
-		address[] memory path = new address[](2);
-        path[0] = DEA;
-		path[1] = DEUS;
-		
-		uint deadline = block.timestamp + 5;
-		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(deaIn, 0, path, address(this), deadline);
-
-		uint deusIn = amounts[amounts.length - 1];
-        
-		uint ethOut = AMM.calculateSaleReturn(deusIn);
-
-        AMM.sell(deusIn, ethOut);
-		AMM.withdrawPayments(address(this));
-		(msg.sender).transfer(ethOut);
-
-		emit DeaToEth(deaIn, ethOut);
-	}
-
-	function swapDeaToUsdc (
-		uint deaIn
-	) external {
-		IERC20(DEA).transferFrom(msg.sender, address(this), deaIn);
-
-		address[] memory path = new address[](2);
-        path[0] = DEA;
-		path[1] = DEUS;
-		
-		uint deadline = block.timestamp + 5;
-		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(deaIn, 0, path, address(this), deadline);
-
-		uint deusIn = amounts[amounts.length - 1];
-        
-		uint ethOut = AMM.calculateSaleReturn(deusIn);
-
-        AMM.sell(deusIn, ethOut);
-		AMM.withdrawPayments(address(this));
-		
-        path[0] = uniswapRouter.WETH();
-		path[1] = USDC;
-		deadline = block.timestamp + 5;
-
-		amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(0, path, msg.sender, deadline);
-		uint usdcOut = amounts[amounts.length - 1];
-
-		emit DeaToUsdc(deaIn, usdcOut);
-	}
-
-	function swapDeaToDeus (
-		uint deaIn
-	) external {
-		IERC20(DEA).transferFrom(msg.sender, address(this), deaIn);
-
-		address[] memory path = new address[](2);
-        path[0] = DEA;
-		path[1] = DEUS;
-		
-		uint deadline = block.timestamp + 5;
-		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(deaIn, 0, path, msg.sender, deadline);
-		uint deusOut = amounts[amounts.length - 1];
-
-		emit DeaToDeus(deaIn, deusOut);
-	}
-
-
-	function swapUsdcToDea (
-		uint usdcIn
-	) external {
-		IERC20(USDC).transferFrom(msg.sender, address(this), usdcIn);
-	    
-		address[] memory path = new address[](2);
-        path[0] = USDC;
-		path[1] = uniswapRouter.WETH();
-
-		uint deadline = block.timestamp + 5;
-
-		uint[] memory amounts = uniswapRouter.swapExactTokensForETH(usdcIn, 0, path, address(this), deadline);
-
-		uint ethIn = amounts[amounts.length - 1];
-
-		uint deusOut = AMM.calculatePurchaseReturn(ethIn);
-
-        AMM.buy{value: ethIn}(deusOut);
-
-        path[0] = DEUS;
-		path[1] = DEA;
-        
-		deadline = block.timestamp + 5;
-		amounts = uniswapRouter.swapExactTokensForTokens(deusOut, 0, path, msg.sender, deadline);
-		uint deaOut = amounts[amounts.length - 1];
-		
-		emit UsdcToDea(usdcIn, deaOut);
-	}
-	
-	function swapDeusToUsdc (
-		uint deusIn
-	) external {
-	    IERC20(DEUS).transferFrom(msg.sender, address(this), deusIn);
-	    
-		uint ethOut = AMM.calculateSaleReturn(deusIn);
-
-        AMM.sell(deusIn, ethOut);
-		AMM.withdrawPayments(address(this));
-
-		address[] memory path = new address[](2);
-        path[0] = uniswapRouter.WETH();
-		path[1] = USDC;
-		uint deadline = block.timestamp + 5;
-
-		uint[] memory amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(0, path, msg.sender, deadline);
-		uint usdcOut = amounts[amounts.length - 1];
-
-		emit DeusToUsdc(deusIn, usdcOut);
-	}
-
-	function swapDeusToDea (
-		uint deusIn
-	) external {
-		IERC20(DEUS).transferFrom(msg.sender, address(this), deusIn);
-
-		address[] memory path = new address[](2);
-        path[0] = DEUS;
-		path[1] = DEA;
-		
-		uint deadline = block.timestamp + 5;
-		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(deusIn, 0, path, msg.sender, deadline);
-		uint deaOut = amounts[amounts.length - 1];
-
-		emit DeusToDea(deusIn, deaOut);
-	}
-
-
-	function swapUsdcToDeus (
-		uint usdcIn
-	) external {
-	    IERC20(USDC).transferFrom(msg.sender, address(this), usdcIn);
-	    
-		address[] memory path = new address[](2);
-        path[0] = USDC;
-		path[1] = uniswapRouter.WETH();
-
-		uint deadline = block.timestamp + 5;
-
-		uint[] memory amounts = uniswapRouter.swapExactTokensForETH(usdcIn, 0, path, address(this), deadline);
-
-		uint ethIn = amounts[amounts.length - 1];
-
-		uint deusOut = AMM.calculatePurchaseReturn(ethIn);
-
-        AMM.buy{value: ethIn}(deusOut);
-
-		IERC20(DEUS).transfer(msg.sender, deusOut);
-
-		emit UsdcToDeus(usdcIn, deusOut);
-	}
-
-	function swapEthToUsdc () external payable {
-		address[] memory path = new address[](2);
-        path[0] = uniswapRouter.WETH();
-		path[1] = USDC;
-		uint deadline = block.timestamp + 5;
-
-		uint[] memory amounts = uniswapRouter.swapExactETHForTokens{value: msg.value}(0, path, msg.sender, deadline);
-		uint usdcOut = amounts[amounts.length - 1];
-
-		emit EthToUsdc(msg.value, usdcOut);
-	}
-
-	function swapUsdcToEth (
-		uint usdcIn
-	) external {
-		IERC20(DEA).transferFrom(msg.sender, address(this), usdcIn);
-
-		address[] memory path = new address[](2);
-        path[0] = DEA;
-		path[1] = uniswapRouter.WETH();
-		uint deadline = block.timestamp + 5;
-
-		uint[] memory amounts = uniswapRouter.swapExactTokensForETH(usdcIn, 0, path, msg.sender, deadline);
-		uint ethOut = amounts[amounts.length - 1];
-
-		emit UsdcToEth(usdcIn, ethOut);
-	}
-
 
 	receive() external payable {
 		// receive ether
