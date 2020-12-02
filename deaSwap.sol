@@ -35,16 +35,7 @@ contract DeaSwap is PullPayment {
 	AutomaticMarketMaker public AMM;
 	IUniswapV2Router02 public uniswapRouter;
 	
-	event DeaToEth(uint deaIn, uint ethOut);
-	event EthToDea(uint ethIn, uint deaOut);
-	event DeaToUsdc(uint deaIn, uint usdcOut);
-	event UsdcToDea(uint usdcIn, uint deaOut);
-	event DeusToUsdc(uint deusIn, uint usdcOut);
-	event UsdcToDeus(uint usdcIn, uint deusOut);
-	event DeaToDeus(uint deaIn, uint deusOut);
-	event DeusToDea(uint deusIn, uint deaOut);
-	event EthToUsdc(uint ethIn, uint usdcOut);
-	event UsdcToEth(uint usdcIn, uint ethOut);
+	event swap(address from, address to, uint amountIn, uint amountOut);
 
 	constructor() public {
 		uniswapRouter = IUniswapV2Router02(uniswapRouterAddress);
@@ -56,6 +47,34 @@ contract DeaSwap is PullPayment {
 		IERC20(DEA).approve(address(uniswapRouter), MAX_INT);
 		IERC20(USDC).approve(address(uniswapRouter), MAX_INT);
 		IERC20(DEUS).approve(address(AMM), MAX_INT);
+	}
+
+
+	function swapEthForTokens(
+		address[] path,
+		uint type
+	) {
+		require(type >= 0 && type <= 1, "Invalid Type");
+		
+	}
+
+	function swapTokensForEth(
+		uint amountIn,
+		int type,
+		address[] path
+	) {
+		require(type >= 0 && type <= 1, "Invalid Type");
+
+	}
+
+	function swapTokensForTokens(
+		uint amountIn,
+		uint type,
+		address[] path1,
+		address[] paht2
+	) {
+		require(type >= 0 && type <= 2, "Invalid Type");
+
 	}
 
 
