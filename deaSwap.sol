@@ -86,6 +86,9 @@ contract DeaSwap is PullPayment {
 		address[] memory path
 	) external {
 		require(swapType >= 0 && swapType <= 1, "Invalid swapType");
+		
+		IERC20(address(path[0])).transferFrom(msg.sender, address(this), amountIn);
+		
 		if(swapType == 0) {
 			uint ethOut = AMM.calculateSaleReturn(amountIn);
 
@@ -111,6 +114,9 @@ contract DeaSwap is PullPayment {
 		address[] memory path2
 	) external {
 		require(swapType >= 0 && swapType <= 2, "Invalid swapType");
+		
+		IERC20(address(path1[0])).transferFrom(msg.sender, address(this), amountIn);
+		
 		if(swapType == 0) {
 			uint deadline = block.timestamp + 5;
 
