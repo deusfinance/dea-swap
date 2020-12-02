@@ -60,14 +60,14 @@ contract DeaSwap is PullPayment {
 			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(estimatedDeus, 1, path, msg.sender, deadline);
 			uint amountOfTokenOut = amounts[amounts.length - 1];
 
-			emit swap(address(0), paht[path.length - 1], msg.value, amountOfTokenOut);
+			emit swap(address(0), path[path.length - 1], msg.value, amountOfTokenOut);
 		} else {
 			uint deadline = block.timestamp + 5;
 
 			uint[] memory amounts = uniswapRouter.swapExactETHForTokens{value: msg.value}(1, path, msg.sender, deadline);
 			uint amountOfTokenOut = amounts[amounts.length - 1];
 
-			emit swap(address(0), paht[path.length - 1], msg.value, amountOfTokenOut);
+			emit swap(address(0), path[path.length - 1], msg.value, amountOfTokenOut);
 		}
 	}
 
@@ -78,9 +78,21 @@ contract DeaSwap is PullPayment {
 	) external {
 		require(type >= 0 && type <= 1, "Invalid Type");
 		if(type == 0) {
-			
+
+			uint ethOut = AMM.calculateSaleReturn(amountIn);
+
+			AMM.sell(amountIn, ethOut);
+			AMM.withdrawPayments(address(this));
+			(msg.sender).transfer(ethOut);
+
+			emit swap(path[path.length - 1], address(0), amountIn, ethOut);
 		} else {
-			
+			uint deadline = block.timestamp + 5;
+
+			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path, msg.sender, deadline);
+			uint amountOfTokenOut = amounts[amounts.length - 1];
+
+			emit swap(path[path.length - 1], address(0), amountIn, amountOfTokenOut);
 		}
 	}
 
@@ -88,15 +100,16 @@ contract DeaSwap is PullPayment {
 		uint amountIn,
 		uint type,
 		address[] path1,
-		address[] paht2
+		address[] path2
 	) external {
 		require(type >= 0 && type <= 2, "Invalid Type");
 		if(type == 0) {
+			swap
 			
 		} else if (type == 1) {
 			
 		} else {
-			
+
 		}
 	}
 
