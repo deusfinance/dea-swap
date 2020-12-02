@@ -24,10 +24,6 @@ contract DeaSwap is PullPayment {
 	using SafeMath for uint;
 	
 	uint256 MAX_INT = uint256(-1);
-	
-    address DEUS = 0xf025DB474fcF9bA30844e91A54bC4747d4FC7842;
-    address DEA = 0x02b7a1AF1e9c7364Dd92CdC3b09340Aea6403934;
-	address USDC = 0xAedAb46B9dca7EE3Ab303B088eCCB83443db24A1;
 
 	address internal constant uniswapRouterAddress = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
 	address internal constant AutomaticMarketMakerAddress = 0x6D3459E48C5D106e97FeC08284D56d43b00C2AB4;
@@ -35,7 +31,7 @@ contract DeaSwap is PullPayment {
 	AutomaticMarketMaker public AMM;
 	IUniswapV2Router02 public uniswapRouter;
 	
-	event swap(address from, address to, uint amountIn, uint amountOut);
+	event swap(address fromToken, address toToken, uint amountIn, uint amountOut);
 
 	constructor() public {
 		uniswapRouter = IUniswapV2Router02(uniswapRouterAddress);
@@ -53,18 +49,39 @@ contract DeaSwap is PullPayment {
 	function swapEthForTokens(
 		address[] path,
 		uint type
-	) {
+	) external payable {
 		require(type >= 0 && type <= 1, "Invalid Type");
-		
+		if(type == 0) {
+			uint estimatedDeus = AMM.calculatePurchaseReturn(msg.value);
+        	AMM.buy{value: msg.value}(estimatedDeus);
+			
+			uint deadline = block.timestamp + 5;
+
+			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(estimatedDeus, 1, path, msg.sender, deadline);
+			uint amountOfTokenOut = amounts[amounts.length - 1];
+
+			emit swap(address(0), paht[path.length - 1], msg.value, amountOfTokenOut);
+		} else {
+			uint deadline = block.timestamp + 5;
+
+			uint[] memory amounts = uniswapRouter.swapExactETHForTokens{value: msg.value}(1, path, msg.sender, deadline);
+			uint amountOfTokenOut = amounts[amounts.length - 1];
+
+			emit swap(address(0), paht[path.length - 1], msg.value, amountOfTokenOut);
+		}
 	}
 
 	function swapTokensForEth(
 		uint amountIn,
 		int type,
 		address[] path
-	) {
+	) external {
 		require(type >= 0 && type <= 1, "Invalid Type");
-
+		if(type == 0) {
+			
+		} else {
+			
+		}
 	}
 
 	function swapTokensForTokens(
@@ -72,9 +89,15 @@ contract DeaSwap is PullPayment {
 		uint type,
 		address[] path1,
 		address[] paht2
-	) {
+	) external {
 		require(type >= 0 && type <= 2, "Invalid Type");
-
+		if(type == 0) {
+			
+		} else if (type == 1) {
+			
+		} else {
+			
+		}
 	}
 
 
