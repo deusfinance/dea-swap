@@ -82,8 +82,8 @@ contract DeaSwap is PullPayment {
 
 	function swapTokensForEth(
 		uint amountIn,
-		int swapType,
-		address[] memory path // without ETH address end of path
+		uint swapType,
+		address[] memory path
 	) external {
 		require(swapType >= 0 && swapType <= 1, "Invalid swapType");
 		
@@ -106,7 +106,6 @@ contract DeaSwap is PullPayment {
 			emit swap(path[path.length - 1], address(0), amountIn, ethOut);
 		} else {
 			uint deadline = block.timestamp + 5;
-			path[path.length] = uniswapRouter.WETH();
 
 			uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path, msg.sender, deadline);
 			uint amountOfTokenOut = amounts[amounts.length - 1];
