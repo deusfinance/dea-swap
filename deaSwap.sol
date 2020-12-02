@@ -27,6 +27,11 @@ contract DeaSwap is PullPayment {
 
 	address internal constant uniswapRouterAddress = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
 	address internal constant AutomaticMarketMakerAddress = 0x6D3459E48C5D106e97FeC08284D56d43b00C2AB4;
+	
+	//delete after test
+	address DEUS = 0xf025DB474fcF9bA30844e91A54bC4747d4FC7842;
+    address DEA = 0x02b7a1AF1e9c7364Dd92CdC3b09340Aea6403934;
+	address USDC = 0xAedAb46B9dca7EE3Ab303B088eCCB83443db24A1;
 
 	AutomaticMarketMaker public AMM;
 	IUniswapV2Router02 public uniswapRouter;
@@ -51,11 +56,11 @@ contract DeaSwap is PullPayment {
 
 
 	function swapEthForTokens(
-		address[] path,
-		uint type
+		address[] memory path,
+		uint swapType
 	) external payable {
-		require(type >= 0 && type <= 1, "Invalid Type");
-		if(type == 0) {
+		require(swapType >= 0 && swapType <= 1, "Invalid swapType");
+		if(swapType == 0) {
 			uint estimatedDeus = AMM.calculatePurchaseReturn(msg.value);
         	AMM.buy{value: msg.value}(estimatedDeus);
 			
@@ -77,11 +82,11 @@ contract DeaSwap is PullPayment {
 
 	function swapTokensForEth(
 		uint amountIn,
-		int type,
-		address[] path
+		int swapType,
+		address[] memory path
 	) external {
-		require(type >= 0 && type <= 1, "Invalid Type");
-		if(type == 0) {
+		require(swapType >= 0 && swapType <= 1, "Invalid swapType");
+		if(swapType == 0) {
 			uint ethOut = AMM.calculateSaleReturn(amountIn);
 
 			AMM.sell(amountIn, ethOut);
@@ -101,12 +106,12 @@ contract DeaSwap is PullPayment {
 
 	function swapTokensForTokens(
 		uint amountIn,
-		uint type,
-		address[] path1,
-		address[] path2
+		uint swapType,
+		address[] memory path1,
+		address[] memory path2
 	) external {
-		require(type >= 0 && type <= 2, "Invalid Type");
-		if(type == 0) {
+		require(swapType >= 0 && swapType <= 2, "Invalid swapType");
+		if(swapType == 0) {
 			uint deadline = block.timestamp + 5;
 
 			uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path1, address(this), deadline);
@@ -121,7 +126,7 @@ contract DeaSwap is PullPayment {
 			uint amountOfTokenOut = amounts[amounts.length - 1];
 
 			emit swap(path1[0], path2[path2.length - 1], amountIn, amountOfTokenOut);
-		} else if (type == 1) {
+		} else if (swapType == 1) {
 			uint deadline = block.timestamp + 5;
 
 			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), deadline);
