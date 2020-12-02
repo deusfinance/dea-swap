@@ -87,9 +87,10 @@ contract DeaSwap is PullPayment {
 
 			emit swap(path[path.length - 1], address(0), amountIn, ethOut);
 		} else {
+			path[path.length] = uniswapRouter.WETH();
 			uint deadline = block.timestamp + 5;
 
-			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path, msg.sender, deadline);
+			uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path, msg.sender, deadline);
 			uint amountOfTokenOut = amounts[amounts.length - 1];
 
 			emit swap(path[path.length - 1], address(0), amountIn, amountOfTokenOut);
