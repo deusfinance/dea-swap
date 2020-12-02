@@ -45,6 +45,10 @@ contract DeaSwap is PullPayment {
 		IERC20(DEUS).approve(address(AMM), MAX_INT);
 	}
 
+	function approveToken(address token) public {
+		IERC20(token).approve(address(uniswapRouter), MAX_INT);
+	}
+
 
 	function swapEthForTokens(
 		address[] path,
