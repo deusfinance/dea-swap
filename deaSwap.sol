@@ -83,22 +83,30 @@ contract DeaSwap is PullPayment {
 	function swapTokensForEth(
 		uint amountIn,
 		int swapType,
-		address[] memory path
+		address[] memory path // without ETH address end of path
 	) external {
 		require(swapType >= 0 && swapType <= 1, "Invalid swapType");
 		
 		IERC20(address(path[0])).transferFrom(msg.sender, address(this), amountIn);
 		
 		if(swapType == 0) {
-			uint ethOut = AMM.calculateSaleReturn(amountIn);
-
-			AMM.sell(amountIn, ethOut);
+		    uint amountOfDeusOut = amountIn;
+		    if(path.length > 1) {
+    		    uint deadline = block.timestamp + 5;
+                
+    			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path, address(this), deadline);
+    			amountOfDeusOut = amounts[amounts.length - 1];
+		    }
+		    
+		    uint ethOut = AMM.calculateSaleReturn(amountOfDeusOut);
+			AMM.sell(amountOfDeusOut, ethOut);
 			AMM.withdrawPayments(address(this));
 			(msg.sender).transfer(ethOut);
 
 			emit swap(path[path.length - 1], address(0), amountIn, ethOut);
 		} else {
 			uint deadline = block.timestamp + 5;
+			path[path.length] = uniswapRouter.WETH();
 
 			uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path, msg.sender, deadline);
 			uint amountOfTokenOut = amounts[amounts.length - 1];
@@ -150,7 +158,7 @@ contract DeaSwap is PullPayment {
 			emit swap(path1[0], path2[path2.length - 1], amountIn, amountOfTokenOut);
 		} else {
 			uint deadline = block.timestamp + 5;
-			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), deadline);
+			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, msg.sender, deadline);
 			uint amountOfTokenOut = amounts[amounts.length - 1];
 
 			emit swap(path1[0], path1[path1.length - 1], amountIn, amountOfTokenOut);
