@@ -64,10 +64,13 @@ contract DeaSwap is PullPayment {
 			uint estimatedDeus = AMM.calculatePurchaseReturn(msg.value);
         	AMM.buy{value: msg.value}(estimatedDeus);
 			
-			uint deadline = block.timestamp + 5;
+			uint amountOfTokenOut = estimatedDeus;
+			if(path.length > 1) {
+				uint deadline = block.timestamp + 5;
 
-			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(estimatedDeus, 1, path, msg.sender, deadline);
-			uint amountOfTokenOut = amounts[amounts.length - 1];
+				uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(estimatedDeus, 1, path, msg.sender, deadline);
+				amountOfTokenOut = amounts[amounts.length - 1];
+			}
 
 			emit swap(address(0), path[path.length - 1], msg.value, amountOfTokenOut);
 		} else {
