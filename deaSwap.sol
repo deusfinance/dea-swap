@@ -3,7 +3,7 @@ pragma solidity ^0.6.12;
 import "https://github.com/Uniswap/uniswap-v2-periphery/blob/master/contracts/interfaces/IUniswapV2Router02.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/math/SafeMath.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/payment/PullPayment.sol";
-
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/SafeERC20.sol";
 
 interface AutomaticMarketMaker {
 	function buy(uint256 _tokenAmount) external payable;
@@ -13,15 +13,10 @@ interface AutomaticMarketMaker {
 	function withdrawPayments(address payable payee) external;
 }
 
-interface IERC20 {
-    function approve(address spender, uint256 amount) external returns (bool);
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-	function transfer(address recipient, uint256 amount) external returns (bool);
-}
-
 
 contract DeaSwap is PullPayment {
 	using SafeMath for uint;
+	using SafeERC20 for IERC20;
 	
 	uint256 MAX_INT = uint256(-1);
 
@@ -31,7 +26,8 @@ contract DeaSwap is PullPayment {
 	//delete after test
 	address DEUS = 0xf025DB474fcF9bA30844e91A54bC4747d4FC7842;
     address DEA = 0x02b7a1AF1e9c7364Dd92CdC3b09340Aea6403934;
-	address USDC = 0xAedAb46B9dca7EE3Ab303B088eCCB83443db24A1;
+	address USDC = 0x259F784f5b96B3f761b0f9B1d74F820C393ebd36;
+	address USDT = 0xA0953584886d983333D8Ca9844D0372F0c6F850D;
 
 	AutomaticMarketMaker public AMM;
 	IUniswapV2Router02 public uniswapRouter;
@@ -48,6 +44,7 @@ contract DeaSwap is PullPayment {
 		IERC20(DEA).approve(address(uniswapRouter), MAX_INT);
 		IERC20(USDC).approve(address(uniswapRouter), MAX_INT);
 		IERC20(DEUS).approve(address(AMM), MAX_INT);
+		IERC20(USDT).safeApprove(address(uniswapRouter), MAX_INT);
 	}
 
 	function approveToken(address token) public {
@@ -70,6 +67,8 @@ contract DeaSwap is PullPayment {
 
 				uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(estimatedDeus, 1, path, msg.sender, deadline);
 				amountOfTokenOut = amounts[amounts.length - 1];
+			} else {
+			    IERC20(DEUS).transfer(msg.sender, estimatedDeus);
 			}
 
 			emit swap(address(0), path[path.length - 1], msg.value, amountOfTokenOut);
@@ -137,16 +136,26 @@ contract DeaSwap is PullPayment {
         	AMM.buy{value: amountOfEthOut}(estimatedDeus);
 			
 			deadline = block.timestamp + 5;
-
-			amounts = uniswapRouter.swapExactTokensForTokens(estimatedDeus, 1, path2, msg.sender, deadline);
-			uint amountOfTokenOut = amounts[amounts.length - 1];
+			
+			uint amountOfTokenOut = estimatedDeus;
+			if(path2.length > 1) {
+    			amounts = uniswapRouter.swapExactTokensForTokens(estimatedDeus, 1, path2, msg.sender, deadline);
+    			amountOfTokenOut = amounts[amounts.length - 1];
+			} else {
+			    IERC20(DEUS).transfer(msg.sender, estimatedDeus);
+			}
 
 			emit swap(path1[0], path2[path2.length - 1], amountIn, amountOfTokenOut);
 		} else if (swapType == 1) {
 			uint deadline = block.timestamp + 5;
-
-			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), deadline);
-			uint amountOfDeusOut = amounts[amounts.length - 1];
+            
+            uint amountOfDeusOut = amountIn;
+            uint[] memory amounts;
+            
+            if(path1.length > 1) {
+    			amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), deadline);
+    			amountOfDeusOut = amounts[amounts.length - 1];
+            }
 
 			uint ethOut = AMM.calculateSaleReturn(amountOfDeusOut);
 			AMM.sell(amountIn, ethOut);
