@@ -13,6 +13,10 @@ interface AutomaticMarketMaker {
 	function withdrawPayments(address payable payee) external;
 }
 
+interface StaticPriceSale {
+
+}
+
 
 contract DeaSwap is PullPayment {
 	using SafeMath for uint;
@@ -20,35 +24,51 @@ contract DeaSwap is PullPayment {
 	
 	uint256 MAX_INT = uint256(-1);
 
-	address internal constant uniswapRouterAddress = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-	address internal constant AutomaticMarketMakerAddress = 0x6D3459E48C5D106e97FeC08284D56d43b00C2AB4;
+	// address public uniswapRouterAddress = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+	// address public AutomaticMarketMakerAddress = 0x6D3459E48C5D106e97FeC08284D56d43b00C2AB4;
+	// address public StaticPriceSale = 0x0;
 	
-	//delete after test
-	address DEUS = 0xf025DB474fcF9bA30844e91A54bC4747d4FC7842;
-    address DEA = 0x02b7a1AF1e9c7364Dd92CdC3b09340Aea6403934;
-	address USDC = 0x259F784f5b96B3f761b0f9B1d74F820C393ebd36;
-	address USDT = 0xA0953584886d983333D8Ca9844D0372F0c6F850D;
+	// for initialize
+	address public DEUS = 0x3b62F3820e0B035cc4aD602dECe6d796BC325325;
+    address public DEA = 0x80aB141F324C3d6F2b18b030f1C4E95d4d658778;
+	address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+	address public USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+	address public DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+	address public Coinbase = 0x4185cf99745B2a20727B37EE798193DD4a56cDfa;
+	address public WBTC = 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599;
+
 
 	AutomaticMarketMaker public AMM;
 	IUniswapV2Router02 public uniswapRouter;
+	StaticPriceSale public SPS;
 	
 	event swap(address fromToken, address toToken, uint amountIn, uint amountOut);
 
-	constructor() public {
-		uniswapRouter = IUniswapV2Router02(uniswapRouterAddress);
-		AMM = AutomaticMarketMaker(AutomaticMarketMakerAddress);
+	constructor(address _uniswapRouter, address _AMM, address _SPS) public {
+		uniswapRouter = IUniswapV2Router02(_uniswapRouter);
+		AMM = AutomaticMarketMaker(_AMM);
+		SPS = StaticPriceSale(_SPS);
 	}
 
-	function approve() public {
+	function initialize() public {
+		IERC20(DEUS).approve(address(AMM), MAX_INT);
+		IERC20(DEUS).approve(address(SPS), MAX_INT);
 		IERC20(DEUS).approve(address(uniswapRouter), MAX_INT);
 		IERC20(DEA).approve(address(uniswapRouter), MAX_INT);
 		IERC20(USDC).approve(address(uniswapRouter), MAX_INT);
-		IERC20(DEUS).approve(address(AMM), MAX_INT);
 		IERC20(USDT).safeApprove(address(uniswapRouter), MAX_INT);
+		IERC20(DAI).approve(address(uniswapRouter), MAX_INT);
+		IERC20(Coinbase).approve(address(uniswapRouter), MAX_INT);
+		IERC20(Coinbase).approve(address(AMM), MAX_INT);
+		IERC20(WBTC).approve(address(uniswapRouter), MAX_INT);
 	}
 
 	function approveToken(address token) public {
 		IERC20(token).approve(address(uniswapRouter), MAX_INT);
+	}
+
+	function safeApproveToken(address token) public {
+		IERC20(token).safeApprove(address(uniswapRouter), MAX_INT);
 	}
 
 
@@ -56,7 +76,7 @@ contract DeaSwap is PullPayment {
 		address[] memory path,
 		uint swapType
 	) external payable {
-		require(swapType >= 0 && swapType <= 1, "Invalid swapType");
+		require(swapType >= 0 && swapType <= 2, "Invalid swapType");
 		if(swapType == 0) {
 			uint estimatedDeus = AMM.calculatePurchaseReturn(msg.value);
         	AMM.buy{value: msg.value}(estimatedDeus);
@@ -72,13 +92,18 @@ contract DeaSwap is PullPayment {
 			}
 
 			emit swap(address(0), path[path.length - 1], msg.value, amountOfTokenOut);
-		} else {
+		} else if (swapType == 1) {
 			uint deadline = block.timestamp + 5;
 
 			uint[] memory amounts = uniswapRouter.swapExactETHForTokens{value: msg.value}(1, path, msg.sender, deadline);
 			uint amountOfTokenOut = amounts[amounts.length - 1];
 
 			emit swap(address(0), path[path.length - 1], msg.value, amountOfTokenOut);
+		} else {
+
+
+
+
 		}
 	}
 
@@ -87,7 +112,7 @@ contract DeaSwap is PullPayment {
 		uint swapType,
 		address[] memory path
 	) external {
-		require(swapType >= 0 && swapType <= 1, "Invalid swapType");
+		require(swapType >= 0 && swapType <= 2, "Invalid swapType");
 		
 		IERC20(address(path[0])).transferFrom(msg.sender, address(this), amountIn);
 		
@@ -106,13 +131,19 @@ contract DeaSwap is PullPayment {
 			(msg.sender).transfer(ethOut);
 
 			emit swap(path[path.length - 1], address(0), amountIn, ethOut);
-		} else {
+		} else if (swapType == 1) {
 			uint deadline = block.timestamp + 5;
 
 			uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path, msg.sender, deadline);
 			uint amountOfTokenOut = amounts[amounts.length - 1];
 
 			emit swap(path[path.length - 1], address(0), amountIn, amountOfTokenOut);
+		} else {
+
+
+
+
+
 		}
 	}
 
@@ -122,7 +153,7 @@ contract DeaSwap is PullPayment {
 		address[] memory path1,
 		address[] memory path2
 	) external {
-		require(swapType >= 0 && swapType <= 2, "Invalid swapType");
+		require(swapType >= 0 && swapType <= 6, "Invalid swapType");
 		
 		IERC20(address(path1[0])).transferFrom(msg.sender, address(this), amountIn);
 		
@@ -167,12 +198,27 @@ contract DeaSwap is PullPayment {
 			uint amountOfTokenOut = amounts[amounts.length - 1];
 
 			emit swap(path1[0], path2[path2.length - 1], amountIn, amountOfTokenOut);
-		} else {
+		} else if (swapType == 2) {
 			uint deadline = block.timestamp + 5;
 			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, msg.sender, deadline);
 			uint amountOfTokenOut = amounts[amounts.length - 1];
 
 			emit swap(path1[0], path1[path1.length - 1], amountIn, amountOfTokenOut);
+		} else if (swapType == 3) {
+
+
+		} else if (swapType == 4) {
+
+
+
+		} else if (swapType == 5) {
+
+
+
+		} else {
+
+
+
 		}
 	}
 
