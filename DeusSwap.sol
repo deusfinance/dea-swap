@@ -151,7 +151,7 @@ contract DeusSwap is PullPayment, Ownable {
 			(uint256 estimatedCoinbase, ) = SPS.calculatePurchaseReturn(estimatedDeus);
 
 			SPS.buyFor(msg.sender, estimatedCoinbase, estimatedDeus);
-			IERC20(Coinbase).transfer(msg.sender, estimatedCoinbase);
+			// IERC20(Coinbase).transfer(msg.sender, estimatedCoinbase);
 			emit swap(address(0), Coinbase, msg.value, estimatedCoinbase);
 		}
 	}
@@ -163,9 +163,9 @@ contract DeusSwap is PullPayment, Ownable {
 	) external {
 		require(swapType >= 0 && swapType <= 2, "Invalid swapType");
 		
-		IERC20(address(path[0])).transferFrom(msg.sender, address(this), amountIn);
-		
 		if(swapType == 0) {
+		    IERC20(address(path[0])).transferFrom(msg.sender, address(this), amountIn);
+		    
 		    uint amountOfDeusOut = amountIn;
 		    if(path.length > 1) {
     		    uint deadline = block.timestamp + 5;
@@ -181,6 +181,8 @@ contract DeusSwap is PullPayment, Ownable {
 
 			emit swap(path[path.length - 1], address(0), amountIn, ethOut);
 		} else if (swapType == 1) {
+		    IERC20(address(path[0])).transferFrom(msg.sender, address(this), amountIn);
+		    
 			uint deadline = block.timestamp + 5;
 
 			uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path, msg.sender, deadline);
@@ -212,9 +214,9 @@ contract DeusSwap is PullPayment, Ownable {
 	) external {
 		require(swapType >= 0 && swapType <= 8, "Invalid swapType");
 		
-		IERC20(address(path1[0])).transferFrom(msg.sender, address(this), amountIn);
-		
 		if(swapType == 0) {
+		    IERC20(address(path1[0])).transferFrom(msg.sender, address(this), amountIn);
+		    
 			uint deadline = block.timestamp + 5;
 
 			uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path1, address(this), deadline);
@@ -235,6 +237,8 @@ contract DeusSwap is PullPayment, Ownable {
 
 			emit swap(path1[0], path2[path2.length - 1], amountIn, amountOfTokenOut);
 		} else if (swapType == 1) {
+		    IERC20(address(path1[0])).transferFrom(msg.sender, address(this), amountIn);
+		    
 			uint deadline = block.timestamp + 5;
             
             uint amountOfDeusOut = amountIn;
@@ -256,6 +260,8 @@ contract DeusSwap is PullPayment, Ownable {
 
 			emit swap(path1[0], path2[path2.length - 1], amountIn, amountOfTokenOut);
 		} else if (swapType == 2) {
+		    IERC20(address(path1[0])).transferFrom(msg.sender, address(this), amountIn);
+		    
 			uint deadline = block.timestamp + 5;
 			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, msg.sender, deadline);
 			uint amountOfTokenOut = amounts[amounts.length - 1];
@@ -304,7 +310,7 @@ contract DeusSwap is PullPayment, Ownable {
 			(uint256 estimatedCoinbase, ) = SPS.calculatePurchaseReturn(estimatedDeus);
 			SPS.buyFor(msg.sender, estimatedCoinbase, estimatedDeus);
 
-			IERC20(Coinbase).transfer(msg.sender, estimatedCoinbase);
+			// IERC20(Coinbase).transfer(msg.sender, estimatedCoinbase);
 			emit swap(path1[0], Coinbase, amountIn, estimatedCoinbase);
 
 		} else if (swapType == 6) {
@@ -317,7 +323,7 @@ contract DeusSwap is PullPayment, Ownable {
 
 			(uint256 estimatedCoinbase, ) = SPS.calculatePurchaseReturn(amountOfDeusOut);
 			SPS.buyFor(msg.sender, estimatedCoinbase, amountOfDeusOut);
-			IERC20(Coinbase).transfer(msg.sender, estimatedCoinbase);
+			// IERC20(Coinbase).transfer(msg.sender, estimatedCoinbase);
 
 			emit swap(path1[0], Coinbase, amountIn, estimatedCoinbase);
 
@@ -326,7 +332,7 @@ contract DeusSwap is PullPayment, Ownable {
 
 			(uint256 estimatedCoinbase, ) = SPS.calculatePurchaseReturn(amountIn);
 			SPS.buyFor(msg.sender, estimatedCoinbase, amountIn);
-			IERC20(Coinbase).transfer(msg.sender, estimatedCoinbase);
+			// IERC20(Coinbase).transfer(msg.sender, estimatedCoinbase);
 
 			emit swap(DEUS, Coinbase, amountIn, estimatedCoinbase);
 
