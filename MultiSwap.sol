@@ -34,13 +34,6 @@ interface AutomaticMarketMaker {
 	function withdrawPayments(address payable payee) external;
 }
 
-interface IPOAutomaticMarketMaker {
-	function buyFor(address _user, uint256 coinbaseTokenAmount, uint256 deusAmount) external;
-	function sellFor(address _user, uint256 coinbaseTokenAmount, uint256 deusAmount) external;
-	function calculatePurchaseReturn(uint256 deusAmount) external returns (uint256, uint256);
-	function calculateSaleReturn(uint256 coinbaseTokenAmount) external returns (uint256, uint256);
-}
-
 
 contract MultiSwap is Ownable {
 	using SafeMath for uint;
@@ -61,65 +54,119 @@ contract MultiSwap is Ownable {
 	constructor(address _uniswapRouter, address _AMM) {
 		uniswapRouter = IUniswapV2Router02(_uniswapRouter);
 		AMM = AutomaticMarketMaker(_AMM);
-	}
-
-	function changeAMM(address _amm) public onlyOwner {
-		AMM = AutomaticMarketMaker(_amm);
-	}
-
-	function initialize() public {
 		IERC20(DEUS).approve(address(uniswapRouter), MAX_INT);
 		IERC20(DEA).approve(address(uniswapRouter), MAX_INT);
 		IERC20(USDC).approve(address(uniswapRouter), MAX_INT);
-// 		IERC20(DAI).approve(address(uniswapRouter), MAX_INT);
-// 		IERC20(WBTC).approve(address(uniswapRouter), MAX_INT);
+		IERC20(DAI).approve(address(uniswapRouter), MAX_INT);
+		IERC20(WBTC).approve(address(uniswapRouter), MAX_INT);
+	}
+
+	function setAMM(address _amm) public onlyOwner {
+		AMM = AutomaticMarketMaker(_amm);
 	}
 
 	function approveToken(address token, address _where) public onlyOwner {
 		IERC20(token).approve(_where, MAX_INT);
 	}
 
-	function swapEthForTokens(
+
+	function collectTokens(address token, uint amount, address to) external onlyOwner {
+	    IERC20(token).transfer(to, amount);
+	}
+
+	receive() external payable {
+		// receive ether
+	}
+
+
+	///////////////////////////////////////////////////////////////
+
+
+	function EthDeusUni(
 		address[] memory path,
 		uint minAmountOut
 	) external payable {
-		require(msg.value > 0, "no ether");
-
 		uint estimatedDeus = AMM.calculatePurchaseReturn(msg.value);
 		AMM.buy{value: msg.value}(estimatedDeus);
-		
-		uint amountOfTokenOut = estimatedDeus;
 	
 		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(estimatedDeus, minAmountOut, path, msg.sender, block.timestamp);
 
 		emit swap(address(0), path[path.length - 1], msg.value, amounts[amounts.length - 1]);
 	}
 	
+	function uniEthDeusUni(
+		uint amountIn,
+		address[] memory path1,
+		address[] memory path2,
+		uint minAmountOut
+	) external {
+		IERC20(address(path1[0])).transferFrom(msg.sender, address(this), amountIn);
 
-	function swapTokensForEth(
+		uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path1, address(this), block.timestamp);
+		uint amountOfEthOut = amounts[amounts.length - 1];
+
+		uint outputAmount = AMM.calculatePurchaseReturn(amountOfEthOut);
+		if(path2.length > 1) {
+			AMM.buy{value: amountOfEthOut}(outputAmount);
+			
+			amounts = uniswapRouter.swapExactTokensForTokens(outputAmount, minAmountOut, path2, msg.sender, block.timestamp);
+			emit swap(path1[0], path2[path2.length - 1], amountIn, amounts[amounts.length - 1]);
+		} else {
+			AMM.buy{value: amountOfEthOut}(minAmountOut);
+			IERC20(DEUS).transfer(msg.sender, outputAmount);
+			emit swap(path1[0], DEUS, amountIn, outputAmount);
+		}	
+	}
+
+
+	function uniDeusEth(
 		uint amountIn,
 		address[] memory path,
 		uint minAmountOut
 	) external {
 		IERC20(address(path[0])).transferFrom(msg.sender, address(this), amountIn);
 		
-		uint amountOfDeusOut = amountIn;
 		if(path.length > 1) {
 			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path, address(this), block.timestamp);
-			amountOfDeusOut = amounts[amounts.length - 1];
+			amountIn = amounts[amounts.length - 1];
 		}
 		
-		uint ethOut = AMM.calculateSaleReturn(amountOfDeusOut);
-		AMM.sell(amountOfDeusOut, ethOut);
+		uint ethOut = AMM.calculateSaleReturn(amountIn);
+		AMM.sell(amountIn, minAmountOut);
 		AMM.withdrawPayments(address(this));
 		(msg.sender).transfer(ethOut);
-
-		require(ethOut >= minAmountOut, "Price changed");
 
 		emit swap(path[0], address(0), amountIn, ethOut);
 	}
 
-	function swapTokensForEthOnUniswap(
+
+	function uniDeusEthUni(
+		uint amountIn,
+		address[] memory path1,
+		address[] memory path2,
+		uint minAmountOut
+	) external {
+		IERC20(address(path1[0])).transferFrom(msg.sender, address(this), amountIn);
+		
+		uint[] memory amounts;
+		
+		if(path1.length > 1) {
+			amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), block.timestamp);
+			amountIn = amounts[amounts.length - 1];
+		}
+
+		uint ethOut = AMM.calculateSaleReturn(amountIn);
+		AMM.sell(amountIn, ethOut);
+		AMM.withdrawPayments(address(this));
+
+		amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(minAmountOut, path2, msg.sender, block.timestamp);
+
+		emit swap(path1[0], path2[path2.length - 1], amountIn, amounts[amounts.length - 1]);
+	}
+
+	///////////////////////////////////////////////////////////////
+
+	function tokensToEthOnUni(
 		uint amountIn,
 		address[] memory path,
 		uint minAmountOut
@@ -131,58 +178,7 @@ contract MultiSwap is Ownable {
 		emit swap(path[0], address(0), amountIn, amounts[amounts.length - 1]);
 	}
 
-	function swapTokensForTokensByBuyDeus(
-		uint amountIn,
-		address[] memory path1,
-		address[] memory path2,
-		uint minAmountOut
-	) external {
-		IERC20(address(path1[0])).transferFrom(msg.sender, address(this), amountIn);
-
-		uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path1, address(this), block.timestamp);
-		uint amountOfEthOut = amounts[amounts.length - 1];
-
-		uint estimatedDeus = AMM.calculatePurchaseReturn(amountOfEthOut);
-		AMM.buy{value: amountOfEthOut}(estimatedDeus);
-		
-		uint amountOfTokenOut = estimatedDeus;
-		if(path2.length > 1) {
-			amounts = uniswapRouter.swapExactTokensForTokens(estimatedDeus, minAmountOut, path2, msg.sender, block.timestamp);
-			amountOfTokenOut = amounts[amounts.length - 1];
-		} else {
-			IERC20(DEUS).transfer(msg.sender, estimatedDeus);
-			require(estimatedDeus >= minAmountOut, "Price changed");
-		}
-
-		emit swap(path1[0], path2[path2.length - 1], amountIn, amountOfTokenOut);
-	}
-
-	function swapTokensForTokensBySellDeus(
-		uint amountIn,
-		address[] memory path1,
-		address[] memory path2,
-		uint minAmountOut
-	) external {
-		IERC20(address(path1[0])).transferFrom(msg.sender, address(this), amountIn);
-		
-		uint amountOfDeusOut = amountIn;
-		uint[] memory amounts;
-		
-		if(path1.length > 1) {
-			amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), block.timestamp);
-			amountOfDeusOut = amounts[amounts.length - 1];
-		}
-
-		uint ethOut = AMM.calculateSaleReturn(amountOfDeusOut);
-		AMM.sell(amountOfDeusOut, ethOut);
-		AMM.withdrawPayments(address(this));
-
-		amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(minAmountOut, path2, msg.sender, block.timestamp);
-
-		emit swap(path1[0], path2[path2.length - 1], amountIn, amounts[amounts.length - 1]);
-	}
-
-	function swapTokensForTokensOnUniswap(
+	function tokensToTokensOnUni(
 		uint amountIn,
 		address[] memory path,
 		uint minAmountOut
@@ -193,15 +189,6 @@ contract MultiSwap is Ownable {
 
 		emit swap(path[0], path[path.length - 1], amountIn, amounts[amounts.length - 1]);
 	}
-	
-	function collectTokens(address _token, uint amount) external onlyOwner {
-	    IERC20(_token).transfer(msg.sender, amount);
-	}
-
-	receive() external payable {
-		// receive ether
-	}
-
 }
 
 // Dar panah Khoda
