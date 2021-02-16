@@ -1,7 +1,7 @@
 // Be name Khoda
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.7.6;
+pragma solidity 0.8.1;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/math/SafeMath.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
@@ -38,7 +38,7 @@ interface AutomaticMarketMaker {
 contract MultiSwap is Ownable {
 	using SafeMath for uint;
 	
-	uint256 MAX_INT = uint256(-1);
+	uint256 MAX_INT = type(uint256).max;
 	
 	address public DEUS = 0x3b62F3820e0B035cc4aD602dECe6d796BC325325;
  	address public DEA = 0x80aB141F324C3d6F2b18b030f1C4E95d4d658778;
@@ -133,8 +133,8 @@ contract MultiSwap is Ownable {
 		
 		uint ethOut = AMM.calculateSaleReturn(amountIn);
 		AMM.sell(amountIn, minAmountOut);
-		AMM.withdrawPayments(address(this));
-		(msg.sender).transfer(ethOut);
+		AMM.withdrawPayments(payable(address(this)));
+		payable(msg.sender).transfer(ethOut);
 
 		emit swap(path[0], address(0), amountIn, ethOut);
 	}
@@ -157,7 +157,7 @@ contract MultiSwap is Ownable {
 
 		uint ethOut = AMM.calculateSaleReturn(amountIn);
 		AMM.sell(amountIn, ethOut);
-		AMM.withdrawPayments(address(this));
+		AMM.withdrawPayments(payable(address(this)));
 
 		amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(minAmountOut, path2, msg.sender, block.timestamp);
 
