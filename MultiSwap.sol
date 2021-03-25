@@ -124,11 +124,13 @@ contract MultiSwap is Ownable {
 		address[] memory path,
 		uint minAmountOut
 	) external {
-		IERC20(address(path[0])).transferFrom(msg.sender, address(this), amountIn);
 		
-		if(path.length > 1) {
+		if(path.length > 0) {
+			IERC20(address(path[0])).transferFrom(msg.sender, address(this), amountIn);
 			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path, address(this), block.timestamp);
 			amountIn = amounts[amounts.length - 1];
+		} else {
+			IERC20(DEUS).transferFrom(msg.sender, address(this), amountIn);
 		}
 		
 		uint ethOut = AMM.calculateSaleReturn(amountIn);
