@@ -30,7 +30,7 @@ interface AutomaticMarketMaker {
 	function withdrawPayments(address payable payee) external;
 }
 
-contract ExitBalancer is Ownable {
+contract ExitLock is Ownable {
 
 	IBPool public bpt;
 	IUniswapV2Router02 public uniswapRouter;
@@ -49,6 +49,14 @@ contract ExitBalancer is Ownable {
 		IERC20(token).approve(recipient, amount);
 	}
 
+	function changeBPT(address _bpt) onlyOwner {
+		bpt = IBPool(_bpt);
+	}
+
+	function changeAMM(address _amm) onlyOwner {
+		AMM = AutomaticMarketMaker(_amm);
+	}
+
 	function bpt2Eth(address tokenOut, uint poolAmountIn, uint[] memory minAmountsOut, address[] memory path) external {
 		bpt.transferFrom(msg.sender, address(this), poolAmountIn);
 		uint deaAmount = bpt.exitswapPoolAmountIn(tokenOut, poolAmountIn, minAmountsOut[0]);
@@ -62,4 +70,8 @@ contract ExitBalancer is Ownable {
 		uint deaAmount = bpt.exitswapPoolAmountIn(tokenOut, poolAmountIn, minAmountsOut[0]);
 		uniswapRouter.swapExactTokensForTokens(deaAmount, minAmountsOut[1], path, msg.sender, block.timestamp + 1 days);
 	}
+
+	// function sdbETH2DEA() {
+
+	// }
 }
