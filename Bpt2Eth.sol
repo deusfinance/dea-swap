@@ -37,12 +37,12 @@ contract ExitBalancer is Ownable {
 	AutomaticMarketMaker public AMM;
 	uint256 MAX_INT = type(uint256).max;
 
-	constructor (address _uniswapRouter, address _bpt, address _amm) {
+	constructor (address _uniswapRouter, address _bpt, address _amm, address deaToken) {
 		uniswapRouter = IUniswapV2Router02(_uniswapRouter);
 		bpt = IBPool(_bpt);
 		AMM = AutomaticMarketMaker(_amm);
-
-		IERC20(_bpt).approve(_bpt, MAX_INT);
+		
+		IERC20(deaToken).approve(_uniswapRouter, MAX_INT);
 	}
 
 	function approve(address token, address recipient, uint amount) external onlyOwner {
