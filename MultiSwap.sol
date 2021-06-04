@@ -133,13 +133,9 @@ contract MultiSwap is Ownable {
 	) external {
 		// calculate minAmountOut
 		
-		if(path.length > 1) {
-			IERC20(address(path[0])).safeTransferFrom(msg.sender, address(this), amountIn);
-			uint256[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path, address(this), block.timestamp + 5 days);
-			amountIn = amounts[amounts.length - 1];
-		} else {
-			IERC20(dbETH).safeTransferFrom(msg.sender, address(this), amountIn);
-		}
+		IERC20(address(path[0])).safeTransferFrom(msg.sender, address(this), amountIn);
+		uint256[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path, address(this), block.timestamp + 5 days);
+		amountIn = amounts[amounts.length - 1];
 		
 		uint256 wethAmount = automaticMarketMaker.calculateSaleReturn(amountIn);
 		wethProxy.sell(msg.sender, amountIn, wethAmount);
