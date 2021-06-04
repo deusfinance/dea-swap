@@ -105,6 +105,17 @@ contract ExitLock is Ownable {
 		sdea.transfer(msg.sender, sdeaAmount);
 	}
 
+	function sunidd2sdea() external {
+
+	}
+
+	function sunidu2sdea() external {
+		
+	}
+
+	function sunide() external {
+		
+	}
 
 	function withdraw(address token, uint amount, address to) onlyOwner {
 		IERC20(token).transfer(to, amount);
