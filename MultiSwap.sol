@@ -10,21 +10,21 @@ import "https://github.com/itinance/openzeppelin-solidity/blob/escrow-exploratio
 
 interface IUniswapV2Router02 {
     function swapExactTokensForTokens(
-        uint amountIn,
-        uint amountOutMin,
+        uint256 amountIn,
+        uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint deadline
-    ) external returns (uint[] memory amounts);
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
     
-    function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline)
+    function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline)
         external
         payable
-        returns (uint[] memory amounts);
+        returns (uint256[] memory amounts);
         
-    function swapExactTokensForETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline)
+    function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline)
         external
-        returns (uint[] memory amounts);
+        returns (uint256[] memory amounts);
 }
 
 interface IAutomaticMarketMaker {
@@ -35,8 +35,8 @@ interface IAutomaticMarketMaker {
 }
 
 interface IWethProxy {
-	function sell(uint256 dbEthAmount, uint256 _wethAmount) external;
-	function buy(uint256 _dbEthAmount, uint256 _wethAmount) external payable;
+	function sell(address user, uint256 dbEthAmount, uint256 _wethAmount) external;
+	function buy(address user, uint256 _dbEthAmount, uint256 _wethAmount) external payable;
 }
 
 contract MultiSwap is Ownable {
@@ -46,24 +46,38 @@ contract MultiSwap is Ownable {
 	IAutomaticMarketMaker public automaticMarketMaker;
 	IWethProxy public wethProxy;
 	IUniswapV2Router02 public uniswapRouter;
+	address public dbETH;
 	
-	event swap(address user, address fromToken, address toToken, uint amountIn, uint amountOut);
+	event swap(address user, address fromToken, address toToken, uint256 amountIn, uint256 amountOut);
 
-	constructor(address _uniswapRouter, address _automaticMarketMaker, address _wethProxy) {
+	constructor(
+		address _uniswapRouter,
+		address _automaticMarketMaker,
+		address _wethProxy,
+		address _dbETH,
+		address _dea,
+		address _usdc,
+		address _dai,
+		address _wbtc,
+		address _usdt) {
+
 		uniswapRouter = IUniswapV2Router02(_uniswapRouter);
 		automaticMarketMaker = IAutomaticMarketMaker(_automaticMarketMaker);
 		wethProxy = IWethProxy(_wethProxy);
 
-		// IERC20(DEUS).safeApprove(address(uniswapRouter), MAX_INT);
-		// IERC20(DEA).safeApprove(address(uniswapRouter), MAX_INT);
-		// IERC20(USDC).safeApprove(address(uniswapRouter), MAX_INT);
-		// IERC20(DAI).safeApprove(address(uniswapRouter), MAX_INT);
-		// IERC20(WBTC).safeApprove(address(uniswapRouter), MAX_INT);
+		dbETH = _dbETH;
+		IERC20(dbETH).safeApprove(address(uniswapRouter), MAX_INT);
+		IERC20(_dea).safeApprove(address(uniswapRouter), MAX_INT);
+		IERC20(_usdc).safeApprove(address(uniswapRouter), MAX_INT);
+		IERC20(_dai).safeApprove(address(uniswapRouter), MAX_INT);
+		IERC20(_wbtc).safeApprove(address(uniswapRouter), MAX_INT);
+		IERC20(_usdt).safeApprove(address(uniswapRouter), MAX_INT);
 	}
 
 	function setAutomaticMarketMaker(address _automaticMarketMaker) public onlyOwner {
 		automaticMarketMaker = IAutomaticMarketMaker(_automaticMarketMaker);
 	}
+
 	function setWethProxy(address _wethProxy) public onlyOwner {
 		wethProxy = IWethProxy(_wethProxy);
 	}
@@ -72,118 +86,90 @@ contract MultiSwap is Ownable {
 		IERC20(token).safeApprove(_where, MAX_INT);
 	}
 
-
-	///////////////////////////////////////////////////////////////
-
-
-	function EthDeusUni(
-		address[] memory path,
-		uint minAmountOut
-	) external payable {
-		uint estimatedDeus = automaticMarketMaker.calculatePurchaseReturn(msg.value);
-		automaticMarketMaker.buy{value: msg.value}(estimatedDeus);
 	
-		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(estimatedDeus, minAmountOut, path, msg.sender, block.timestamp);
+	function ETH_dbETH_UNI(
+		address[] memory path,
+		uint256 minAmountOut
+	) external payable {
+		// calculate minAmountOut
+
+		(uint256 dbEthAmount, ) = automaticMarketMaker.calculatePurchaseReturn(msg.value);
+		wethProxy.buy{value: msg.value}(address(this), dbEthAmount, msg.value);
+
+		uint256[] memory amounts = uniswapRouter.swapExactTokensForTokens(dbEthAmount, minAmountOut, path, msg.sender, block.timestamp + 5 days);
 
 		emit swap(msg.sender, address(0), path[path.length - 1], msg.value, amounts[amounts.length - 1]);
 	}
 	
-	function uniEthDeusUni(
-		uint amountIn,
+	function UNI_ETH_dbETH_UNI(
+		uint256 amountIn,
 		address[] memory path1,
 		address[] memory path2,
-		uint minAmountOut
+		uint256 minAmountOut
 	) external {
+		// calculate minAmountOut
+
 		IERC20(address(path1[0])).safeTransferFrom(msg.sender, address(this), amountIn);
 
-		uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, 1, path1, address(this), block.timestamp);
-		uint amountOfEthOut = amounts[amounts.length - 1];
+		uint256[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), block.timestamp + 5 days);
+		uint256 wethAmount = amounts[amounts.length - 1];
 
-		uint outputAmount = automaticMarketMaker.calculatePurchaseReturn(amountOfEthOut);
+		uint256 dbEthAmount = automaticMarketMaker.calculatePurchaseReturn(wethAmount);
 		if(path2.length > 1) {
-			automaticMarketMaker.buy{value: amountOfEthOut}(outputAmount);
+			automaticMarketMaker.buyFor(address(this), dbEthAmount, wethAmount);
 			
-			amounts = uniswapRouter.swapExactTokensForTokens(outputAmount, minAmountOut, path2, msg.sender, block.timestamp);
+			amounts = uniswapRouter.swapExactTokensForTokens(dbEthAmount, minAmountOut, path2, msg.sender, block.timestamp + 5 days);
 			emit swap(msg.sender, path1[0], path2[path2.length - 1], amountIn, amounts[amounts.length - 1]);
 		} else {
-			automaticMarketMaker.buy{value: amountOfEthOut}(minAmountOut);
-			IERC20(DEUS).safeTransfer(msg.sender, outputAmount);
-			emit swap(msg.sender, path1[0], DEUS, amountIn, outputAmount);
+			automaticMarketMaker.buyFor(msg.sender, dbEthAmount, wethAmount);
+			emit swap(msg.sender, path1[0], dbETH, amountIn, dbEthAmount);
 		}	
 	}
 
-
-	function uniDeusEth(
-		uint amountIn,
+	function UNI_dbETH_ETH(
+		uint256 amountIn,
 		address[] memory path,
-		uint minAmountOut
+		uint256 minAmountOut
 	) external {
+		// calculate minAmountOut
 		
-		if(path.length > 0) {
+		if(path.length > 1) {
 			IERC20(address(path[0])).safeTransferFrom(msg.sender, address(this), amountIn);
-			uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path, address(this), block.timestamp);
+			uint256[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path, address(this), block.timestamp + 5 days);
 			amountIn = amounts[amounts.length - 1];
 		} else {
-			IERC20(DEUS).safeTransferFrom(msg.sender, address(this), amountIn);
+			IERC20(dbETH).safeTransferFrom(msg.sender, address(this), amountIn);
 		}
 		
-		uint ethOut = automaticMarketMaker.calculateSaleReturn(amountIn);
-		automaticMarketMaker.sell(amountIn, minAmountOut);
-		automaticMarketMaker.withdrawPayments(payable(address(this)));
-		payable(msg.sender).safeTransfer(ethOut);
+		uint256 wethAmount = automaticMarketMaker.calculateSaleReturn(amountIn);
+		wethProxy.sell(msg.sender, amountIn, wethAmount);
 
-		emit swap(msg.sender, path[0], address(0), amountIn, ethOut);
+		emit swap(msg.sender, path[0], address(0), amountIn, wethAmount);
 	}
 
-
-	function uniDeusEthUni(
-		uint amountIn,
+	function UNI_dbETH_ETH_UNI(
+		uint256 amountIn,
 		address[] memory path1,
 		address[] memory path2,
-		uint minAmountOut
+		uint256 minAmountOut
 	) external {
+		// calculate minAmountOut
+
 		IERC20(address(path1[0])).safeTransferFrom(msg.sender, address(this), amountIn);
 		
-		uint[] memory amounts;
+		uint256[] memory amounts;
 		
 		if(path1.length > 1) {
-			amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), block.timestamp);
+			amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), block.timestamp + 5 days);
 			amountIn = amounts[amounts.length - 1];
 		}
 
-		uint ethOut = automaticMarketMaker.calculateSaleReturn(amountIn);
-		automaticMarketMaker.sell(amountIn, ethOut);
-		automaticMarketMaker.withdrawPayments(payable(address(this)));
+		uint256 wethAmount = automaticMarketMaker.calculateSaleReturn(amountIn);
+		automaticMarketMaker.sellFor(address(this), amountIn, wethAmount);
 
-		amounts = uniswapRouter.swapExactETHForTokens{value: ethOut}(minAmountOut, path2, msg.sender, block.timestamp);
+		amounts = uniswapRouter.swapExactTokensForTokens(wethAmount, minAmountOut, path2, msg.sender, block.timestamp + 5 days);
 
 		emit swap(msg.sender, path1[0], path2[path2.length - 1], amountIn, amounts[amounts.length - 1]);
-	}
-
-	///////////////////////////////////////////////////////////////
-
-	function tokensToEthOnUni(
-		uint amountIn,
-		address[] memory path,
-		uint minAmountOut
-	) external {
-		IERC20(address(path[0])).safeTransferFrom(msg.sender, address(this), amountIn);
-		    
-		uint[] memory amounts = uniswapRouter.swapExactTokensForETH(amountIn, minAmountOut, path, msg.sender, block.timestamp);
-
-		emit swap(msg.sender, path[0], address(0), amountIn, amounts[amounts.length - 1]);
-	}
-
-	function tokensToTokensOnUni(
-		uint amountIn,
-		address[] memory path,
-		uint minAmountOut
-	) external {
-		IERC20(address(path[0])).safeTransferFrom(msg.sender, address(this), amountIn);
-		    
-		uint[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, minAmountOut, path, msg.sender, block.timestamp);
-
-		emit swap(msg.sender, path[0], path[path.length - 1], amountIn, amounts[amounts.length - 1]);
 	}
 
 	receive() external payable {
