@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import 'https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.1/contracts/access/Ownable.sol';
+import '@openzeppelin/contracts/access/Ownable.sol';
 
 
 interface IBPool {
@@ -33,6 +33,8 @@ interface IUniswapV2Router02 {
 	address to,
 	uint deadline
 	) external returns (uint[] memory amounts);
+
+	function getAmountsOut(uint amountIn, address[] memory path) external  returns (uint[] memory amounts);
 }
 
 interface AutomaticMarketMaker {
@@ -113,7 +115,7 @@ contract ExitLock is Ownable {
 		
 	}
 
-	function sunide() external {
+	function sunide2sdea() external {
 		
 	}
 
