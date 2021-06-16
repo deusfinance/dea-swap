@@ -3,9 +3,9 @@
 
 pragma solidity ^0.8.4;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.1/contracts/token/ERC20/IERC20.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.1/contracts/access/Ownable.sol";
-import "https://github.com/itinance/openzeppelin-solidity/blob/escrow-exploration/contracts/token/ERC20/SafeERC20.sol";	
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";	
 
 
 interface IUniswapV2Router02 {
@@ -25,6 +25,8 @@ interface IUniswapV2Router02 {
     function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline)
         external
         returns (uint256[] memory amounts);
+
+    function getAmountsOut(uint amountIn, address[] memory path) external view returns (uint[] memory amounts);
 }
 
 interface IAutomaticMarketMaker {
@@ -91,7 +93,8 @@ contract MultiSwap is Ownable {
 		address[] memory path,
 		uint256 minAmountOut
 	) external payable {
-		// calculate minAmountOut
+		uint256 calcMinAmountOut = Calc_ETH_dbETH_UNI(msg.value, path);
+        require(minAmountOut >= calcMinAmountOut, "Price Changed");
 
 		(uint256 dbEthAmount, ) = automaticMarketMaker.calculatePurchaseReturn(msg.value);
 		wethProxy.buy{value: msg.value}(address(this), dbEthAmount, msg.value);
@@ -100,6 +103,17 @@ contract MultiSwap is Ownable {
 
 		emit swap(msg.sender, address(0), path[path.length - 1], msg.value, amounts[amounts.length - 1]);
 	}
+
+    function Calc_ETH_dbETH_UNI(
+        uint256 amountIn,
+		address[] memory path
+	) public view returns(uint256) {
+		(uint256 dbEthAmount, ) = automaticMarketMaker.calculatePurchaseReturn(amountIn);
+
+		uint256[] memory amounts = uniswapRouter.getAmountsOut(dbEthAmount, path);
+
+		return amounts[amounts.length - 1];
+	}
 	
 	function UNI_ETH_dbETH_UNI(
 		uint256 amountIn,
@@ -107,14 +121,16 @@ contract MultiSwap is Ownable {
 		address[] memory path2,
 		uint256 minAmountOut
 	) external {
-		// calculate minAmountOut
+		uint256 calcMinAmountOut = Calc_UNI_ETH_dbETH_UNI(amountIn, path1, path2);
+        require(minAmountOut >= calcMinAmountOut, "Price Changed");
+
 
 		IERC20(address(path1[0])).safeTransferFrom(msg.sender, address(this), amountIn);
 
 		uint256[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path1, address(this), block.timestamp + 5 days);
 		uint256 wethAmount = amounts[amounts.length - 1];
 
-		uint256 dbEthAmount = automaticMarketMaker.calculatePurchaseReturn(wethAmount);
+		(uint256 dbEthAmount, ) = automaticMarketMaker.calculatePurchaseReturn(wethAmount);
 		if(path2.length > 1) {
 			automaticMarketMaker.buyFor(address(this), dbEthAmount, wethAmount);
 			
@@ -126,21 +142,53 @@ contract MultiSwap is Ownable {
 		}	
 	}
 
+    function Calc_UNI_ETH_dbETH_UNI(
+		uint256 amountIn,
+		address[] memory path1,
+		address[] memory path2
+	) public view returns(uint256) {
+
+		uint256[] memory amounts = uniswapRouter.getAmountsOut(amountIn, path1);
+		uint256 wethAmount = amounts[amounts.length - 1];
+
+		(uint256 dbEthAmount, ) = automaticMarketMaker.calculatePurchaseReturn(wethAmount);
+		if(path2.length > 1) {
+			amounts = uniswapRouter.getAmountsOut(dbEthAmount, path2);
+			return amounts[amounts.length - 1];
+		} else {
+			return dbEthAmount;
+		}	
+	}
+
+
 	function UNI_dbETH_ETH(
 		uint256 amountIn,
 		address[] memory path,
 		uint256 minAmountOut
 	) external {
-		// calculate minAmountOut
+		uint256 calcMinAmountOut = Calc_UNI_dbETH_ETH(amountIn, path);
+        require(minAmountOut >= calcMinAmountOut, "Price Changed");
 		
 		IERC20(address(path[0])).safeTransferFrom(msg.sender, address(this), amountIn);
 		uint256[] memory amounts = uniswapRouter.swapExactTokensForTokens(amountIn, 1, path, address(this), block.timestamp + 5 days);
 		amountIn = amounts[amounts.length - 1];
 		
-		uint256 wethAmount = automaticMarketMaker.calculateSaleReturn(amountIn);
+		(uint256 wethAmount, ) = automaticMarketMaker.calculateSaleReturn(amountIn);
 		wethProxy.sell(msg.sender, amountIn, wethAmount);
 
 		emit swap(msg.sender, path[0], address(0), amountIn, wethAmount);
+	}
+
+    function Calc_UNI_dbETH_ETH(
+		uint256 amountIn,
+		address[] memory path
+	) public view returns(uint256) {
+		
+		uint256[] memory amounts = uniswapRouter.getAmountsOut(amountIn, path);
+		amountIn = amounts[amounts.length - 1];
+		
+		(uint256 wethAmount, ) = automaticMarketMaker.calculateSaleReturn(amountIn);
+        return wethAmount;
 	}
 
 	function UNI_dbETH_ETH_UNI(
@@ -149,7 +197,8 @@ contract MultiSwap is Ownable {
 		address[] memory path2,
 		uint256 minAmountOut
 	) external {
-		// calculate minAmountOut
+		uint256 calcMinAmountOut = Calc_UNI_dbETH_ETH_UNI(amountIn, path1, path2);
+        require(minAmountOut >= calcMinAmountOut, "Price Changed");
 
 		IERC20(address(path1[0])).safeTransferFrom(msg.sender, address(this), amountIn);
 		
@@ -160,12 +209,30 @@ contract MultiSwap is Ownable {
 			amountIn = amounts[amounts.length - 1];
 		}
 
-		uint256 wethAmount = automaticMarketMaker.calculateSaleReturn(amountIn);
+		(uint256 wethAmount, ) = automaticMarketMaker.calculateSaleReturn(amountIn);
 		automaticMarketMaker.sellFor(address(this), amountIn, wethAmount);
 
 		amounts = uniswapRouter.swapExactTokensForTokens(wethAmount, minAmountOut, path2, msg.sender, block.timestamp + 5 days);
 
 		emit swap(msg.sender, path1[0], path2[path2.length - 1], amountIn, amounts[amounts.length - 1]);
+	}
+
+    function Calc_UNI_dbETH_ETH_UNI(
+		uint256 amountIn,
+		address[] memory path1,
+		address[] memory path2
+	) public view returns(uint256) {		
+		uint256[] memory amounts;
+		
+		if(path1.length > 1) {
+			amounts = uniswapRouter.getAmountsOut(amountIn, path1);
+			amountIn = amounts[amounts.length - 1];
+		}
+
+		(uint256 wethAmount, ) = automaticMarketMaker.calculateSaleReturn(amountIn);
+
+		amounts = uniswapRouter.getAmountsOut(wethAmount, path2);
+        return amounts[amounts.length - 1];
 	}
 
 	receive() external payable {
