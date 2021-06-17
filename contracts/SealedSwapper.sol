@@ -81,7 +81,7 @@ interface AutomaticMarketMaker {
 	function withdrawPayments(address payable payee) external;
 }
 
-contract SealdUniSwapper is Ownable {
+contract SealedSwapper is Ownable {
 
 	IBPool public bpt;
 	IUniswapV2Router02 public uniswapRouter;
@@ -198,7 +198,7 @@ contract SealdUniSwapper is Ownable {
 		uint256[] memory balancerMinAmountsOut,
 		uint256 DDMinAmountsOut,
 		uint256 sUniDDMinAmountsOut,
-		uint256[] memory sUniDEMinAmountsOut,
+		uint256 sUniDEMinAmountsOut,
 		uint256[] memory sUniDUMinAmountsOut,
 		address[] memory DDPath,
 		address[] memory sUniDDPath,
@@ -270,7 +270,7 @@ contract SealdUniSwapper is Ownable {
 		
 	// }
 
-	function sUniDE2sdea(uint256 sUniDEAmount, uint256[] memory minAmountsOut, address[] memory path) public {
+	function sUniDE2sdea(uint256 sUniDEAmount, uint256 minAmountOut, address[] memory path) public {
 		sUniDE.burn(msg.sender, sUniDEAmount);
 
 		uint256 totalSupply = IERC20(uniDE).totalSupply();
@@ -279,7 +279,7 @@ contract SealdUniSwapper is Ownable {
 		(uint256 deusAmount, uint256 ethAmount) = uniswapRouter.removeLiquidityETH(deus, sUniDEAmount, deusMinAmountOut, ethMinAmountOut, address(this), block.timestamp + 1 days);
 		uint256 deusAmount2 = AMM.calculatePurchaseReturn(ethAmount);
 		AMM.buy{value: ethAmount}(deusAmount2);
-		uint256 deaAmount = uniswapRouter.swapExactTokensForTokens(deusAmount + deusAmount2, minAmountsOut[0], path, address(this), block.timestamp + 1 days)[1];
+		uint256 deaAmount = uniswapRouter.swapExactTokensForTokens(deusAmount + deusAmount2, minAmountOut, path, address(this), block.timestamp + 1 days)[1];
 
 		uint256 sdeaAmount = sdeaVault.lockFor(deaAmount, msg.sender);
 
