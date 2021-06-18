@@ -320,7 +320,8 @@ contract SealedSwapper is AccessControl {
 		sdea.transfer(msg.sender, sdeaAmount);
 	}
 
-	function withdraw(address token, uint256 amount, address to) public onlyOwner {
+	function withdraw(address token, uint256 amount, address to) public {
+		require(hasRole(OPERATOR_ROLE, msg.sender), "Caller is not an operator");
 		IERC20(token).transfer(to, amount);
 	}
 
