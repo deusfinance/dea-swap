@@ -108,6 +108,8 @@ contract SealedSwapper is AccessControl {
 	
 	uint256 MAX_INT = type(uint256).max;
 
+	event Swap(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
+
 	constructor (
 			address _uniswapRouter,
 			address _bpt,
@@ -199,18 +201,23 @@ contract SealedSwapper is AccessControl {
 		uint256 sdeaAmount = sdeaVault.lockFor(deaAmount, msg.sender);
 
 		sdea.transfer(msg.sender, sdeaAmount);
+		emit Swap(address(bpt), address(sdea), poolAmountIn, sdeaAmount);
 	}
 
 	function sdea2dea(uint256 amount, address recipient) external {
 		require(hasRole(SDEA_CONVERTER_ROLE, msg.sender), "Caller is not a SDEA_CONVERTER");
 		sdea.burn(msg.sender, amount);
 		IERC20(dea).transfer(recipient, amount);
+		
+		emit Swap(address(sdea), dea, amount, amount);
 	}
 
 	function sdeus2deus(uint256 amount, address recipient) external {
 		require(hasRole(SDEUS_CONVERTER_ROLE, msg.sender), "Caller is not a SDEUS_CONVERTER");
 		sdeus.burn(msg.sender, amount);
 		IERC20(dea).transfer(recipient, amount);
+
+		emit Swap(address(sdeus), deus, amount, amount);
 	}
 
 	function bpt2sdea(
@@ -240,7 +247,10 @@ contract SealedSwapper is AccessControl {
 		sUniDU.burn(address(this), sUniDUAmount);
 		uniDU2sdea(sUniDUAmount, sUniDUMinAmountsOut);
 
-		sdea.transfer(msg.sender, sdea.balanceOf(address(this)));
+		uint256 sdeaAmount = sdea.balanceOf(address(this));
+		sdea.transfer(msg.sender, sdeaAmount);
+
+		emit Swap(address(bpt), address(sdea), poolAmountIn, sdeaAmount);
 	}
 
 	function minAmountsCalculator(uint256 univ2Amount, uint256 totalSupply, uint256 reserve1, uint256 reserve2) pure internal returns(uint256, uint256) {
@@ -265,6 +275,8 @@ contract SealedSwapper is AccessControl {
 		uint256 sdeaAmount = uniDD2sdea(sUniDDAmount, minAmountOut);
 
 		sdea.transfer(msg.sender, sdeaAmount);
+
+		emit Swap(uniDD, address(sdea), sUniDDAmount, sdeaAmount);
 	}
 
 	// function sUniDU2sdea() public {
@@ -295,6 +307,8 @@ contract SealedSwapper is AccessControl {
 		uint256 sdeaAmount = uniDU2sdea(sUniDUAmount, minAmountsOut);
 
 		sdea.transfer(msg.sender, sdeaAmount);
+
+		emit Swap(uniDU, address(sdea), sUniDUAmount, sdeaAmount);
 	}
 
 	// function sUniDE2sdea() public {
@@ -318,6 +332,8 @@ contract SealedSwapper is AccessControl {
 		uint256 sdeaAmount = uniDE2sdea(sUniDEAmount, minAmountOut);
 
 		sdea.transfer(msg.sender, sdeaAmount);
+
+		emit Swap(uniDE, address(sdea), sUniDEAmount, sdeaAmount);
 	}
 
 	function withdraw(address token, uint256 amount, address to) public {
