@@ -165,28 +165,12 @@ contract SealedSwapper is AccessControl {
 		IERC20(token).approve(recipient, amount);
 	}
 
-	function changeBPT(address _bpt) external {
-		require(hasRole(OPERATOR_ROLE, msg.sender), "Caller is not an operator");
-		bpt = IBPool(_bpt);
-	}
-
-	function changeAMM(address _amm) external {
-		require(hasRole(OPERATOR_ROLE, msg.sender), "Caller is not an operator");
-		AMM = AutomaticMarketMaker(_amm);
-	}
-
 	function bpt2eth(address tokenOut, uint256 poolAmountIn, uint256[] memory minAmountsOut) public {
 		bpt.transferFrom(msg.sender, address(this), poolAmountIn);
 		uint256 deaAmount = bpt.exitswapPoolAmountIn(tokenOut, poolAmountIn, minAmountsOut[0]);
 		uint256 deusAmount = uniswapRouter.swapExactTokensForTokens(deaAmount, minAmountsOut[1], deus2deaPath, address(this), block.timestamp + 1 days)[1];
 		AMM.sell(deusAmount, minAmountsOut[2]);
 		AMM.withdrawPayments(payable(msg.sender));
-	}
-
-	function bpt2Uni(address tokenOut, uint256 poolAmountIn, uint256[] memory minAmountsOut, address[] memory path) public {
-		bpt.transferFrom(msg.sender, address(this), poolAmountIn);
-		uint256 deaAmount = bpt.exitswapPoolAmountIn(tokenOut, poolAmountIn, minAmountsOut[0]);
-		uniswapRouter.swapExactTokensForTokens(deaAmount, minAmountsOut[1], path, msg.sender, block.timestamp + 1 days);
 	}
 
 	function deus2sdea(uint256 amountIn, uint256 minAmountOut) internal returns(uint256) {
@@ -268,7 +252,7 @@ contract SealedSwapper is AccessControl {
 
 		return sdeaVault.lockFor(deaAmount + deaAmount2, msg.sender);
 	}
-	
+
 	function sUniDD2sdea(uint256 sUniDDAmount, uint256 minAmountOut) public {
 		sUniDD.burn(msg.sender, sUniDDAmount);
 
@@ -278,10 +262,6 @@ contract SealedSwapper is AccessControl {
 
 		emit Swap(uniDD, address(sdea), sUniDDAmount, sdeaAmount);
 	}
-
-	// function sUniDU2sdea() public {
-		
-	// }
 
 	function uniDU2sdea(uint256 sUniDUAmount, uint256[] memory minAmountsOut) internal returns(uint256) {
 		uint256 totalSupply = IERC20(uniDU).totalSupply();
@@ -310,10 +290,6 @@ contract SealedSwapper is AccessControl {
 
 		emit Swap(uniDU, address(sdea), sUniDUAmount, sdeaAmount);
 	}
-
-	// function sUniDE2sdea() public {
-		
-	// }
 
 	function uniDE2sdea(uint256 sUniDEAmount, uint256 minAmountOut) internal returns(uint256) {
 		uint256 totalSupply = IERC20(uniDE).totalSupply();
