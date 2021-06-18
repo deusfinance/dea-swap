@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import '@openzeppelin/contracts/access/Ownable.sol';
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
 
 interface IBPool {
@@ -81,7 +81,11 @@ interface AutomaticMarketMaker {
 	function withdrawPayments(address payable payee) external;
 }
 
-contract SealedSwapper is Ownable {
+contract SealedSwapper is AccessControl {
+
+	bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+	bytes32 public constant SDEA_CONVERTER_ROLE = keccak256("SDEA_CONVERTER_ROLE");
+	bytes32 public constant SDEUS_CONVERTER_ROLE = keccak256("SDEUS_CONVERTER_ROLE");
 
 	IBPool public bpt;
 	IUniswapV2Router02 public uniswapRouter;
@@ -98,6 +102,9 @@ contract SealedSwapper is Ownable {
 	address uniDD;
 	address uniDU;
 	address uniDE;
+
+	address[] public usdc2wethPath =  [0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2];
+	address[] public deus2deaPath =  [0x3b62F3820e0B035cc4aD602dECe6d796BC325325, 0x80aB141F324C3d6F2b18b030f1C4E95d4d658778];
 	
 	uint256 MAX_INT = type(uint256).max;
 
@@ -130,41 +137,46 @@ contract SealedSwapper is Ownable {
 	}
 	
 	function init(
-			address _sdea,
-			address _sdeus,
-			address _sUniDD,
-			address _sUniDE,
-			address _sUniDU
-		) external {
+		address _sdea,
+		address _sdeus,
+		address _sUniDD,
+		address _sUniDE,
+		address _sUniDU
+	) external {
+		require(hasRole(OPERATOR_ROLE, msg.sender), "Caller is not an operator");
 		sdea = SealedToken(_sdea);
 		sdeus = SealedToken(_sdeus);
 		sUniDD = SealedToken(_sUniDD);
 		sUniDE = SealedToken(_sUniDE);
 		sUniDU = SealedToken(_sUniDU);
-	    IERC20(dea).approve(address(uniswapRouter), MAX_INT);
+		IERC20(dea).approve(address(uniswapRouter), MAX_INT);
 		IERC20(deus).approve(address(uniswapRouter), MAX_INT);
 		IERC20(usdc).approve(address(uniswapRouter), MAX_INT);
 		IERC20(uniDD).approve(address(uniswapRouter), MAX_INT);
 		IERC20(uniDE).approve(address(uniswapRouter), MAX_INT);
 		IERC20(uniDU).approve(address(uniswapRouter), MAX_INT);
+		IERC20(dea).approve(address(sdeaVault), MAX_INT);
 	}
 
-	function approve(address token, address recipient, uint256 amount) external onlyOwner {
+	function approve(address token, address recipient, uint256 amount) external {
+		require(hasRole(OPERATOR_ROLE, msg.sender), "Caller is not an operator");
 		IERC20(token).approve(recipient, amount);
 	}
 
-	function changeBPT(address _bpt) external onlyOwner {
+	function changeBPT(address _bpt) external {
+		require(hasRole(OPERATOR_ROLE, msg.sender), "Caller is not an operator");
 		bpt = IBPool(_bpt);
 	}
 
-	function changeAMM(address _amm) external onlyOwner {
+	function changeAMM(address _amm) external {
+		require(hasRole(OPERATOR_ROLE, msg.sender), "Caller is not an operator");
 		AMM = AutomaticMarketMaker(_amm);
 	}
 
-	function bpt2eth(address tokenOut, uint256 poolAmountIn, uint256[] memory minAmountsOut, address[] memory path) public {
+	function bpt2eth(address tokenOut, uint256 poolAmountIn, uint256[] memory minAmountsOut) public {
 		bpt.transferFrom(msg.sender, address(this), poolAmountIn);
 		uint256 deaAmount = bpt.exitswapPoolAmountIn(tokenOut, poolAmountIn, minAmountsOut[0]);
-		uint256 deusAmount = uniswapRouter.swapExactTokensForTokens(deaAmount, minAmountsOut[1], path, address(this), block.timestamp + 1 days)[1];
+		uint256 deusAmount = uniswapRouter.swapExactTokensForTokens(deaAmount, minAmountsOut[1], deus2deaPath, address(this), block.timestamp + 1 days)[1];
 		AMM.sell(deusAmount, minAmountsOut[2]);
 		AMM.withdrawPayments(payable(msg.sender));
 	}
@@ -175,13 +187,9 @@ contract SealedSwapper is Ownable {
 		uniswapRouter.swapExactTokensForTokens(deaAmount, minAmountsOut[1], path, msg.sender, block.timestamp + 1 days);
 	}
 
-	function sdeus2sdea(uint256 amountIn, uint256 minAmountOut, address[] memory path) internal {
-		sdeus.burn(msg.sender, amountIn);
-
-		uint256 deaAmount = uniswapRouter.swapExactTokensForTokens(amountIn, minAmountOut, path, address(this), block.timestamp + 1 days)[1];
-		uint256 sdeaAmount = sdeaVault.lockFor(deaAmount, msg.sender);
-
-		sdea.transfer(msg.sender, sdeaAmount);
+	function deus2sdea(uint256 amountIn, uint256 minAmountOut) internal returns(uint256) {
+		uint256 deaAmount = uniswapRouter.swapExactTokensForTokens(amountIn, minAmountOut, deus2deaPath, address(this), block.timestamp + 1 days)[1];
+		return sdeaVault.lockFor(deaAmount, msg.sender);
 	}
 
 	function bpt2sdea(address tokenOut, uint256 poolAmountIn, uint256 minAmountOut) public {
@@ -193,48 +201,68 @@ contract SealedSwapper is Ownable {
 		sdea.transfer(msg.sender, sdeaAmount);
 	}
 
+	function sdea2dea(uint256 amount, address recipient) external {
+		require(hasRole(SDEA_CONVERTER_ROLE, msg.sender), "Caller is not a SDEA_CONVERTER");
+		sdea.burn(msg.sender, amount);
+		IERC20(dea).transfer(recipient, amount);
+	}
+
+	function sdeus2deus(uint256 amount, address recipient) external {
+		require(hasRole(SDEUS_CONVERTER_ROLE, msg.sender), "Caller is not a SDEUS_CONVERTER");
+		sdeus.burn(msg.sender, amount);
+		IERC20(dea).transfer(recipient, amount);
+	}
+
 	function bpt2sdea(
 		uint256 poolAmountIn,
 		uint256[] memory balancerMinAmountsOut,
 		uint256 DDMinAmountsOut,
 		uint256 sUniDDMinAmountsOut,
 		uint256 sUniDEMinAmountsOut,
-		uint256[] memory sUniDUMinAmountsOut,
-		address[] memory DDPath,
-		address[] memory sUniDDPath,
-		address[] memory sUniDEPath,
-		address[] memory sUniDUPath1,
-		address[] memory sUniDUPath2
-	) public {
+		uint256[] memory sUniDUMinAmountsOut
+	) external {
 		bpt.transferFrom(msg.sender, address(this), poolAmountIn);
 		bpt.exitPool(poolAmountIn, balancerMinAmountsOut);
 
-		sdeus2sdea(sdeus.balanceOf(address(this)), DDMinAmountsOut, DDPath);
-		sUniDD2sdea(sUniDD.balanceOf(address(this)), sUniDDMinAmountsOut, sUniDDPath);
-		sUniDE2sdea(sUniDE.balanceOf(address(this)), sUniDEMinAmountsOut, sUniDEPath);
-		sUniDU2sdea(sUniDU.balanceOf(address(this)), sUniDUMinAmountsOut, sUniDUPath1, sUniDUPath2);
+		uint256 sdeusAmount = sdeus.balanceOf(address(this));
+		sdeus.burn(address(this), sdeusAmount);
+		deus2sdea(sdeusAmount, DDMinAmountsOut);
 
-		uint256 sdeaAmount = sdeaVault.lockFor(IERC20(dea).balanceOf(address(this)), msg.sender);
+		uint256 sUniDDAmount = sUniDD.balanceOf(address(this));
+		sUniDD.burn(address(this), sUniDDAmount);
+		uniDD2sdea(sUniDDAmount, sUniDDMinAmountsOut);
 
-		sdea.transfer(msg.sender, sdeaAmount);
+		uint256 sUniDEAmount = sUniDE.balanceOf(address(this));
+		sUniDE.burn(address(this), sUniDEAmount);
+		uniDE2sdea(sUniDEAmount, sUniDEMinAmountsOut);
+		
+		uint256 sUniDUAmount = sUniDU.balanceOf(address(this));
+		sUniDU.burn(address(this), sUniDUAmount);
+		uniDU2sdea(sUniDUAmount, sUniDUMinAmountsOut);
+
+		sdea.transfer(msg.sender, sdea.balanceOf(address(this)));
 	}
 
 	function minAmountsCalculator(uint256 univ2Amount, uint256 totalSupply, uint256 reserve1, uint256 reserve2) pure internal returns(uint256, uint256) {
-	    return (((univ2Amount/1e5) /  totalSupply * reserve1) * 95 / 100, ((univ2Amount/1e5) / totalSupply * reserve2) * 95 / 100);
+		return (((univ2Amount) /  totalSupply * reserve1) * 95 / 100, ((univ2Amount) / totalSupply * reserve2) * 95 / 100);
 	}
-	
-	function sUniDD2sdea(uint256 sUniDDAmount, uint256 minAmountOut, address[] memory path) public {
-		sUniDD.burn(msg.sender, sUniDDAmount);
 
+	function uniDD2sdea(uint256 sUniDDAmount, uint256 minAmountOut) internal returns(uint256) {
 		uint256 totalSupply = IERC20(uniDD).totalSupply();
 		(uint256 deusReserve, uint256 deaReserve, ) = IUniswapV2Pair(uniDD).getReserves();
 
 		(uint256 deusMinAmountOut, uint256 deaMinAmountOut) = minAmountsCalculator(sUniDDAmount, totalSupply, deusReserve, deaReserve);
 		(uint256 deusAmount, uint256 deaAmount) = uniswapRouter.removeLiquidity(deus, dea, sUniDDAmount, deusMinAmountOut, deaMinAmountOut, address(this), block.timestamp + 1 days);
 
-		uint256 deaAmount2 = uniswapRouter.swapExactTokensForTokens(deusAmount, minAmountOut, path, address(this), block.timestamp + 1 days)[1];
+		uint256 deaAmount2 = uniswapRouter.swapExactTokensForTokens(deusAmount, minAmountOut, deus2deaPath, address(this), block.timestamp + 1 days)[1];
 
-		uint256 sdeaAmount = sdeaVault.lockFor(deaAmount + deaAmount2, msg.sender);
+		return sdeaVault.lockFor(deaAmount + deaAmount2, msg.sender);
+	}
+	
+	function sUniDD2sdea(uint256 sUniDDAmount, uint256 minAmountOut) public {
+		sUniDD.burn(msg.sender, sUniDDAmount);
+
+		uint256 sdeaAmount = uniDD2sdea(sUniDDAmount, minAmountOut);
 
 		sdea.transfer(msg.sender, sdeaAmount);
 	}
@@ -242,26 +270,29 @@ contract SealedSwapper is Ownable {
 	// function sUniDU2sdea() public {
 		
 	// }
-	
 
-	function sUniDU2sdea(uint256 sUniDUAmount, uint256[] memory minAmountsOut, address[] memory path1, address[] memory path2) public {
-		sUniDU.burn(msg.sender, sUniDUAmount);
-
+	function uniDU2sdea(uint256 sUniDUAmount, uint256[] memory minAmountsOut) internal returns(uint256) {
 		uint256 totalSupply = IERC20(uniDU).totalSupply();
 		(uint256 deaReserve, uint256 usdcReserve, ) = IUniswapV2Pair(uniDU).getReserves();
-        
-        (uint256 deaMinAmountOut, uint256 usdcMinAmountOut) = minAmountsCalculator(sUniDUAmount/1e5, totalSupply, deaReserve, usdcReserve);
+		
+		(uint256 deaMinAmountOut, uint256 usdcMinAmountOut) = minAmountsCalculator(sUniDUAmount/1e5, totalSupply, deaReserve, usdcReserve);
 		(uint256 deaAmount, uint256 usdcAmount) = uniswapRouter.removeLiquidity(dea, usdc, (sUniDUAmount/1e5), deaMinAmountOut, usdcMinAmountOut, address(this), block.timestamp + 1 days);
 
-
-		uint256 ethAmount = uniswapRouter.swapExactTokensForETH(usdcAmount, minAmountsOut[0], path1, address(this), block.timestamp + 1 days)[1];
+		uint256 ethAmount = uniswapRouter.swapExactTokensForETH(usdcAmount, minAmountsOut[0], usdc2wethPath, address(this), block.timestamp + 1 days)[1];
 
 		uint256 deusAmount = AMM.calculatePurchaseReturn(ethAmount);
 		AMM.buy{value: ethAmount}(deusAmount);
 		
-		uint256 deaAmount2 = uniswapRouter.swapExactTokensForTokens(deusAmount, minAmountsOut[1], path2, address(this), block.timestamp + 1 days)[1];
+		uint256 deaAmount2 = uniswapRouter.swapExactTokensForTokens(deusAmount, minAmountsOut[1], deus2deaPath, address(this), block.timestamp + 1 days)[1];
 
-		uint256 sdeaAmount = sdeaVault.lockFor(deaAmount + deaAmount2, msg.sender);
+		return sdeaVault.lockFor(deaAmount + deaAmount2, msg.sender);
+	}
+	
+
+	function sUniDU2sdea(uint256 sUniDUAmount, uint256[] memory minAmountsOut) public {
+		sUniDU.burn(msg.sender, sUniDUAmount);
+
+		uint256 sdeaAmount = uniDU2sdea(sUniDUAmount, minAmountsOut);
 
 		sdea.transfer(msg.sender, sdeaAmount);
 	}
@@ -270,18 +301,21 @@ contract SealedSwapper is Ownable {
 		
 	// }
 
-	function sUniDE2sdea(uint256 sUniDEAmount, uint256 minAmountOut, address[] memory path) public {
-		sUniDE.burn(msg.sender, sUniDEAmount);
-
+	function uniDE2sdea(uint256 sUniDEAmount, uint256 minAmountOut) internal returns(uint256) {
 		uint256 totalSupply = IERC20(uniDE).totalSupply();
 		(uint256 deusReserve, uint256 wethReserve, ) = IUniswapV2Pair(uniDE).getReserves();
 		(uint256 deusMinAmountOut, uint256 ethMinAmountOut) = minAmountsCalculator(sUniDEAmount, totalSupply, deusReserve, wethReserve);
 		(uint256 deusAmount, uint256 ethAmount) = uniswapRouter.removeLiquidityETH(deus, sUniDEAmount, deusMinAmountOut, ethMinAmountOut, address(this), block.timestamp + 1 days);
 		uint256 deusAmount2 = AMM.calculatePurchaseReturn(ethAmount);
 		AMM.buy{value: ethAmount}(deusAmount2);
-		uint256 deaAmount = uniswapRouter.swapExactTokensForTokens(deusAmount + deusAmount2, minAmountOut, path, address(this), block.timestamp + 1 days)[1];
+		uint256 deaAmount = uniswapRouter.swapExactTokensForTokens(deusAmount + deusAmount2, minAmountOut, deus2deaPath, address(this), block.timestamp + 1 days)[1];
+		return sdeaVault.lockFor(deaAmount, msg.sender);
+	}
 
-		uint256 sdeaAmount = sdeaVault.lockFor(deaAmount, msg.sender);
+	function sUniDE2sdea(uint256 sUniDEAmount, uint256 minAmountOut) public {
+		sUniDE.burn(msg.sender, sUniDEAmount);
+
+		uint256 sdeaAmount = uniDE2sdea(sUniDEAmount, minAmountOut);
 
 		sdea.transfer(msg.sender, sdeaAmount);
 	}
