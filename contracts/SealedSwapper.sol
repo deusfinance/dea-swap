@@ -5,6 +5,7 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 
 interface IBPool {
@@ -78,11 +79,12 @@ interface AutomaticMarketMaker {
 	function withdrawPayments(address payable payee) external;
 }
 
-contract SealedSwapper is AccessControl {
+contract SealedSwapper is AccessControl, ReentrancyGuard {
 
 	bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 	bytes32 public constant ADMIN_SWAPPER_ROLE = keccak256("ADMIN_SWAPPER_ROLE");
-
+	bytes32 public constant TRUSTY_ROLE = keccak256("TRUSTY_ROLE");
+	
 	IBPool public bpt;
 	IUniswapV2Router02 public uniswapRouter;
 	AutomaticMarketMaker public AMM;
@@ -109,27 +111,31 @@ contract SealedSwapper is AccessControl {
 	uint256 public DERatio;
 	uint256 public DURatio;
 	uint256 public deusRatio;
+	uint256 public DUVaultRatio;
 
 	event Swap(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
 
 	constructor (
-			address _uniswapRouter,
-			address _bpt,
-			address _amm,
-			address _sdeaVault
-		) {
-
+		address _uniswapRouter,
+		address _bpt,
+		address _amm,
+		address _sdeaVault
+	) ReentrancyGuard() {
 		uniswapRouter = IUniswapV2Router02(_uniswapRouter);
 		bpt = IBPool(_bpt);
 		AMM = AutomaticMarketMaker(_amm);
-
 		sdeaVault = Vault(_sdeaVault);
 	}
 	
 	function init(
-		address[] memory tokens
+		address[] memory tokens,
+		uint256 _DERatio,
+		uint256 _DURatio,
+		uint256 _DDRatio,
+		uint256 _deusRatio,
+		uint256 _DUVaultRatio
 	) external {
-		require(hasRole(OPERATOR_ROLE, msg.sender), "Caller is not an operator");
+		require(hasRole(OPERATOR_ROLE, msg.sender), "OPERATOR_ROLE ERROR");
 		sdea = IERC20(tokens[0]);
 		sdeus = IERC20(tokens[1]);
 		sUniDD = IERC20(tokens[2]);
@@ -148,33 +154,27 @@ contract SealedSwapper is AccessControl {
 		uniDE.approve(address(uniswapRouter), MAX_INT);
 		uniDU.approve(address(uniswapRouter), MAX_INT);
 		dea.approve(address(sdeaVault), MAX_INT);
+		DDRatio = _DDRatio;
+		DURatio = _DURatio;
+		DERatio = _DERatio;
+		deusRatio = _deusRatio;
+		DUVaultRatio = _DUVaultRatio;
 	}
 
 	function setRatios(uint256 _DERatio, uint256 _DURatio, uint256 _DDRatio, uint256 _deusRatio) external {
-		require(hasRole(OPERATOR_ROLE, msg.sender), "Caller is not an operator");
+		require(hasRole(OPERATOR_ROLE, msg.sender), "OPERATOR_ROLE ERROR");
 		DDRatio = _DDRatio;
 		DURatio = _DURatio;
 		DERatio = _DERatio;
 		deusRatio = _deusRatio;
 	}
 
-	function setRoutes(address[] memory _usdc2weth, address[] memory _deus2dea) external {
-		require(hasRole(OPERATOR_ROLE, msg.sender), "Caller is not an operator");
-		usdc2wethPath = _usdc2weth;
-		deus2deaPath = _deus2dea;
-	}
-	
-	function setBPT(address _bpt) external {
-		require(hasRole(OPERATOR_ROLE, msg.sender), "Caller is not an operator");
-		bpt = IBPool(_bpt);
-	}
-
 	function approve(address token, address recipient, uint256 amount) external {
-		require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an admin");
+		require(hasRole(TRUSTY_ROLE, msg.sender), "TRUSTY_ROLE ERROR");
 		IERC20(token).approve(recipient, amount);
 	}
 
-	function bpt2eth(address tokenOut, uint256 poolAmountIn, uint256[] memory minAmountsOut) public {
+	function bpt2eth(address tokenOut, uint256 poolAmountIn, uint256[] memory minAmountsOut) public nonReentrant() {
 		bpt.transferFrom(msg.sender, address(this), poolAmountIn);
 		uint256 deaAmount = bpt.exitswapPoolAmountIn(tokenOut, poolAmountIn, minAmountsOut[0]);
 		uint256 deusAmount = uniswapRouter.swapExactTokensForTokens(deaAmount, minAmountsOut[1], deus2deaPath, address(this), block.timestamp + 1 days)[1];
@@ -185,10 +185,10 @@ contract SealedSwapper is AccessControl {
 	}
 
 	function deus2dea(uint256 amountIn) internal returns(uint256) {
-		return  uniswapRouter.swapExactTokensForTokens(amountIn, 1, deus2deaPath, address(this), block.timestamp + 1 days)[1];
+		return uniswapRouter.swapExactTokensForTokens(amountIn, 1, deus2deaPath, address(this), block.timestamp + 1 days)[1];
 	}
 
-	function bpt2sdea(address tokenOut, uint256 poolAmountIn, uint256 minAmountOut) public {
+	function bpt2sdea(address tokenOut, uint256 poolAmountIn, uint256 minAmountOut) public nonReentrant() {
 		bpt.transferFrom(msg.sender, address(this), poolAmountIn);
 
 		uint256 deaAmount = bpt.exitswapPoolAmountIn(tokenOut, poolAmountIn, minAmountOut);
@@ -198,44 +198,44 @@ contract SealedSwapper is AccessControl {
 		emit Swap(address(bpt), address(sdea), poolAmountIn, sdeaAmount);
 	}
 
-	function sdea2dea(uint256 amount, address recipient) external {
-		require(hasRole(ADMIN_SWAPPER_ROLE, msg.sender), "Caller is not an ADMIN_SWAPPER_ROLE");
+	function sdea2dea(uint256 amount, address recipient) external nonReentrant() {
+		require(hasRole(ADMIN_SWAPPER_ROLE, msg.sender), "ADMIN_SWAPPER_ROLE ERROR");
 		sdea.burn(msg.sender, amount);
 		dea.transfer(recipient, amount);
 		
 		emit Swap(address(sdea), address(dea), amount, amount);
 	}
 
-	function sdeus2deus(uint256 amount, address recipient) external {
-		require(hasRole(ADMIN_SWAPPER_ROLE, msg.sender), "Caller is not an ADMIN_SWAPPER_ROLE");
+	function sdeus2deus(uint256 amount, address recipient) external nonReentrant() {
+		require(hasRole(ADMIN_SWAPPER_ROLE, msg.sender), "ADMIN_SWAPPER_ROLE ERROR");
 		sdeus.burn(msg.sender, amount);
 		dea.transfer(recipient, amount);
 
 		emit Swap(address(sdeus), address(deus), amount, amount);
 	}
 
-	function sUniDE2UniDE(uint256 amount, address recipient) external {
-		require(hasRole(ADMIN_SWAPPER_ROLE, msg.sender), "Caller is not an ADMIN_SWAPPER_ROLE");
+	function sUniDE2UniDE(uint256 amount, address recipient) external nonReentrant() {
+		require(hasRole(ADMIN_SWAPPER_ROLE, msg.sender), "ADMIN_SWAPPER_ROLE ERROR");
 		sUniDE.burn(msg.sender, amount);
 		uniDE.transfer(recipient, amount);
 
 		emit Swap(address(sUniDE), address(uniDE), amount, amount);
 	}
 
-	function sUniDD2UniDD(uint256 amount, address recipient) external {
-		require(hasRole(ADMIN_SWAPPER_ROLE, msg.sender), "Caller is not an ADMIN_SWAPPER_ROLE");
+	function sUniDD2UniDD(uint256 amount, address recipient) external nonReentrant() {
+		require(hasRole(ADMIN_SWAPPER_ROLE, msg.sender), "ADMIN_SWAPPER_ROLE ERROR");
 		sUniDD.burn(msg.sender, amount);
 		uniDD.transfer(recipient, amount);
 
 		emit Swap(address(sUniDD), address(uniDD), amount, amount);
 	}
 
-	function sUNIDU2UniDU(uint256 amount, address recipient) external {
-		require(hasRole(ADMIN_SWAPPER_ROLE, msg.sender), "Caller is not an ADMIN_SWAPPER_ROLE");
+	function sUniDU2UniDU(uint256 amount, address recipient) external nonReentrant() {
+		require(hasRole(ADMIN_SWAPPER_ROLE, msg.sender), "ADMIN_SWAPPER_ROLE ERROR");
 		sUniDU.burn(msg.sender, amount);
-		uniDU.transfer(recipient, amount/1e5);
+		uniDU.transfer(recipient, amount/DUVaultRatio);
 
-		emit Swap(address(sUniDU), address(uniDU), amount, amount/1e5);
+		emit Swap(address(sUniDU), address(uniDU), amount, amount/DUVaultRatio);
 	}
 
 	function deaExitAmount(uint256 Predeemed) public view returns(uint256) {
@@ -248,7 +248,7 @@ contract SealedSwapper is AccessControl {
 		uint256 poolAmountIn,
 		uint256[] memory balancerMinAmountsOut,
 		uint256 minAmountOut
-	) external {
+	) external nonReentrant() {
 		bpt.transferFrom(msg.sender, address(this), poolAmountIn);
 		uint256 deaAmount = deaExitAmount(poolAmountIn);
 
@@ -286,10 +286,10 @@ contract SealedSwapper is AccessControl {
 		return deaAmount + deaAmount2;
 	}
 
-	function sUniDD2sdea(uint256 sUniDDAmount, uint256 minAmountOut) public {
+	function sUniDD2sdea(uint256 sUniDDAmount, uint256 minAmountOut) public nonReentrant() {
 		sUniDD.burn(msg.sender, sUniDDAmount);
 
-		uint256 deaAmount = uniDD2sdea(sUniDDAmount / DDRatio * scale);
+		uint256 deaAmount = uniDD2sdea(sUniDDAmount * DDRatio / scale);
 
 		require(deaAmount >= minAmountOut, "INSUFFICIENT_OUTPUT_AMOUNT");
 		sdeaVault.lockFor(deaAmount, address(this));
@@ -299,7 +299,7 @@ contract SealedSwapper is AccessControl {
 	}
 
 	function uniDU2sdea(uint256 sUniDUAmount) internal returns(uint256) {
-		(uint256 deaAmount, uint256 usdcAmount) = uniswapRouter.removeLiquidity(address(dea), address(usdc), (sUniDUAmount/1e5), 1, 1, address(this), block.timestamp + 1 days);
+		(uint256 deaAmount, uint256 usdcAmount) = uniswapRouter.removeLiquidity(address(dea), address(usdc), (sUniDUAmount/DUVaultRatio), 1, 1, address(this), block.timestamp + 1 days);
 
 		uint256 ethAmount = uniswapRouter.swapExactTokensForETH(usdcAmount, 1, usdc2wethPath, address(this), block.timestamp + 1 days)[1];
 
@@ -312,7 +312,7 @@ contract SealedSwapper is AccessControl {
 	}
 	
 
-	function sUniDU2sdea(uint256 sUniDUAmount, uint256 minAmountOut) public {
+	function sUniDU2sdea(uint256 sUniDUAmount, uint256 minAmountOut) public nonReentrant() {
 		sUniDU.burn(msg.sender, sUniDUAmount);
 
 		uint256 deaAmount = uniDU2sdea(sUniDUAmount * DURatio / scale);
@@ -332,7 +332,7 @@ contract SealedSwapper is AccessControl {
 		return deaAmount;
 	}
 
-	function sUniDE2sdea(uint256 sUniDEAmount, uint256 minAmountOut) public {
+	function sUniDE2sdea(uint256 sUniDEAmount, uint256 minAmountOut) public nonReentrant() {
 		sUniDE.burn(msg.sender, sUniDEAmount);
 
 		uint256 deaAmount = uniDE2sdea(sUniDEAmount * DERatio / scale);
@@ -345,7 +345,7 @@ contract SealedSwapper is AccessControl {
 	}
 
 	function withdraw(address token, uint256 amount, address to) public {
-		require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller is not an operator");
+		require(hasRole(TRUSTY_ROLE, msg.sender), "TRUSTY_ROLE ERROR");
 		IERC20(token).transfer(to, amount);
 	}
 
