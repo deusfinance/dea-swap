@@ -242,7 +242,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 	function deaExitAmount(uint256 Predeemed) public view returns(uint256) {
 		uint256 Psupply = bpt.totalSupply();
 		uint256 Bk = dea.balanceOf(address(bpt));
-		return (1 - ((Psupply - Predeemed) / Psupply)) * Bk;
+		return Bk - (((Psupply - Predeemed) * Bk) / Psupply);
 	}
 
 	function bpt2sdea(
