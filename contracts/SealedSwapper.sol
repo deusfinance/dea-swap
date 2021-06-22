@@ -161,12 +161,13 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		DUVaultRatio = _DUVaultRatio;
 	}
 
-	function setRatios(uint256 _DERatio, uint256 _DURatio, uint256 _DDRatio, uint256 _deusRatio) external {
+	function setRatios(uint256 _DERatio, uint256 _DURatio, uint256 _DDRatio, uint256 _deusRatio, uint256 _DUVaultRatio) external {
 		require(hasRole(OPERATOR_ROLE, msg.sender), "OPERATOR_ROLE ERROR");
 		DDRatio = _DDRatio;
 		DURatio = _DURatio;
 		DERatio = _DERatio;
 		deusRatio = _deusRatio;
+		DUVaultRatio = _DUVaultRatio;
 	}
 
 	function approve(address token, address recipient, uint256 amount) external {
