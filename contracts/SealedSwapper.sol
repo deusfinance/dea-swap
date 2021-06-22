@@ -113,7 +113,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 	uint256 public deusRatio;
 	uint256 public DUVaultRatio;
 
-	event Swap(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
+	event Swap(address user, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
 
 	constructor (
 		address _uniswapRouter,
@@ -196,7 +196,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		uint256 sdeaAmount = sdeaVault.lockFor(deaAmount, address(this));
 
 		sdea.transfer(msg.sender, sdeaAmount);
-		emit Swap(address(bpt), address(sdea), poolAmountIn, sdeaAmount);
+		emit Swap(msg.sender, address(bpt), address(sdea), poolAmountIn, sdeaAmount);
 	}
 
 	function sdea2dea(uint256 amount, address recipient) external nonReentrant() {
@@ -204,7 +204,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		sdea.burn(msg.sender, amount);
 		dea.transfer(recipient, amount);
 		
-		emit Swap(address(sdea), address(dea), amount, amount);
+		emit Swap(recipient, address(sdea), address(dea), amount, amount);
 	}
 
 	function sdeus2deus(uint256 amount, address recipient) external nonReentrant() {
@@ -212,7 +212,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		sdeus.burn(msg.sender, amount);
 		dea.transfer(recipient, amount);
 
-		emit Swap(address(sdeus), address(deus), amount, amount);
+		emit Swap(recipient, address(sdeus), address(deus), amount, amount);
 	}
 
 	function sUniDE2UniDE(uint256 amount, address recipient) external nonReentrant() {
@@ -220,7 +220,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		sUniDE.burn(msg.sender, amount);
 		uniDE.transfer(recipient, amount);
 
-		emit Swap(address(sUniDE), address(uniDE), amount, amount);
+		emit Swap(recipient, address(sUniDE), address(uniDE), amount, amount);
 	}
 
 	function sUniDD2UniDD(uint256 amount, address recipient) external nonReentrant() {
@@ -228,7 +228,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		sUniDD.burn(msg.sender, amount);
 		uniDD.transfer(recipient, amount);
 
-		emit Swap(address(sUniDD), address(uniDD), amount, amount);
+		emit Swap(recipient, address(sUniDD), address(uniDD), amount, amount);
 	}
 
 	function sUniDU2UniDU(uint256 amount, address recipient) external nonReentrant() {
@@ -236,7 +236,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		sUniDU.burn(msg.sender, amount);
 		uniDU.transfer(recipient, amount/DUVaultRatio);
 
-		emit Swap(address(sUniDU), address(uniDU), amount, amount/DUVaultRatio);
+		emit Swap(recipient, address(sUniDU), address(uniDU), amount, amount/DUVaultRatio);
 	}
 
 	function deaExitAmount(uint256 Predeemed) public view returns(uint256) {
@@ -276,7 +276,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		sdeaVault.lockFor(deaAmount, address(this));
 		sdea.transfer(msg.sender, deaAmount);
 
-		emit Swap(address(bpt), address(sdea), poolAmountIn, deaAmount);
+		emit Swap(msg.sender, address(bpt), address(sdea), poolAmountIn, deaAmount);
 	}
 
 	function uniDD2sdea(uint256 sUniDDAmount) internal returns(uint256) {
@@ -296,7 +296,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		sdeaVault.lockFor(deaAmount, address(this));
 		sdea.transfer(msg.sender, deaAmount);
 
-		emit Swap(address(uniDD), address(sdea), sUniDDAmount, deaAmount);
+		emit Swap(msg.sender, address(uniDD), address(sdea), sUniDDAmount, deaAmount);
 	}
 
 	function uniDU2sdea(uint256 sUniDUAmount) internal returns(uint256) {
@@ -322,7 +322,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		sdeaVault.lockFor(deaAmount, address(this));
 		sdea.transfer(msg.sender, deaAmount);
 		
-		emit Swap(address(uniDU), address(sdea), sUniDUAmount, deaAmount);
+		emit Swap(msg.sender, address(uniDU), address(sdea), sUniDUAmount, deaAmount);
 	}
 
 	function uniDE2sdea(uint256 sUniDEAmount) internal returns(uint256) {
@@ -342,7 +342,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		sdeaVault.lockFor(deaAmount, address(this));
 		sdea.transfer(msg.sender, deaAmount);
 
-		emit Swap(address(uniDE), address(sdea), sUniDEAmount, deaAmount);
+		emit Swap(msg.sender, address(uniDE), address(sdea), sUniDEAmount, deaAmount);
 	}
 
 	function withdraw(address token, uint256 amount, address to) public {
