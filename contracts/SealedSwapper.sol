@@ -193,7 +193,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		bpt.transferFrom(msg.sender, address(this), poolAmountIn);
 
 		uint256 deaAmount = bpt.exitswapPoolAmountIn(tokenOut, poolAmountIn, minAmountOut);
-		uint256 sdeaAmount = sdeaVault.lockFor(deaAmount, address(this));
+		uint256 sdeaAmount = sdeaVault.lockFor(deaAmount, msg.sender);
 
 		sdea.transfer(msg.sender, sdeaAmount);
 		emit Swap(msg.sender, address(bpt), address(sdea), poolAmountIn, sdeaAmount);
@@ -210,7 +210,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 	function sdeus2deus(uint256 amount, address recipient) external nonReentrant() {
 		require(hasRole(ADMIN_SWAPPER_ROLE, msg.sender), "ADMIN_SWAPPER_ROLE ERROR");
 		sdeus.burn(msg.sender, amount);
-		dea.transfer(recipient, amount);
+		deus.transfer(recipient, amount);
 
 		emit Swap(recipient, address(sdeus), address(deus), amount, amount);
 	}
@@ -261,25 +261,25 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 
 		uint256 sUniDDAmount = sUniDD.balanceOf(address(this));
 		sUniDD.burn(address(this), sUniDDAmount);
-		deaAmount += uniDD2sdea(sUniDDAmount * DDRatio / scale);
+		deaAmount += uniDD2dea(sUniDDAmount * DDRatio / scale);
 
 		uint256 sUniDEAmount = sUniDE.balanceOf(address(this));
 		sUniDE.burn(address(this), sUniDEAmount);
-		deaAmount += uniDE2sdea(sUniDEAmount * DERatio / scale);
-		
+		deaAmount += uniDE2dea(sUniDEAmount * DERatio / scale);
+
 		uint256 sUniDUAmount = sUniDU.balanceOf(address(this));
 		sUniDU.burn(address(this), sUniDUAmount);
-		deaAmount += uniDU2sdea(sUniDUAmount * DURatio / scale);
+		deaAmount += uniDU2dea(sUniDUAmount * DURatio / scale);
 
 		require(deaAmount >= minAmountOut, "INSUFFICIENT_OUTPUT_AMOUNT");
 
-		sdeaVault.lockFor(deaAmount, address(this));
+		sdeaVault.lockFor(deaAmount, msg.sender);
 		sdea.transfer(msg.sender, deaAmount);
 
 		emit Swap(msg.sender, address(bpt), address(sdea), poolAmountIn, deaAmount);
 	}
 
-	function uniDD2sdea(uint256 sUniDDAmount) internal returns(uint256) {
+	function uniDD2dea(uint256 sUniDDAmount) internal returns(uint256) {
 		(uint256 deusAmount, uint256 deaAmount) = uniswapRouter.removeLiquidity(address(deus), address(dea), sUniDDAmount, 1, 1, address(this), block.timestamp + 1 days);
 
 		uint256 deaAmount2 = uniswapRouter.swapExactTokensForTokens(deusAmount, 1, deus2deaPath, address(this), block.timestamp + 1 days)[1];
@@ -290,16 +290,16 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 	function sUniDD2sdea(uint256 sUniDDAmount, uint256 minAmountOut) public nonReentrant() {
 		sUniDD.burn(msg.sender, sUniDDAmount);
 
-		uint256 deaAmount = uniDD2sdea(sUniDDAmount * DDRatio / scale);
+		uint256 deaAmount = uniDD2dea(sUniDDAmount * DDRatio / scale);
 
 		require(deaAmount >= minAmountOut, "INSUFFICIENT_OUTPUT_AMOUNT");
-		sdeaVault.lockFor(deaAmount, address(this));
+		sdeaVault.lockFor(deaAmount, msg.sender);
 		sdea.transfer(msg.sender, deaAmount);
 
 		emit Swap(msg.sender, address(uniDD), address(sdea), sUniDDAmount, deaAmount);
 	}
 
-	function uniDU2sdea(uint256 sUniDUAmount) internal returns(uint256) {
+	function uniDU2dea(uint256 sUniDUAmount) internal returns(uint256) {
 		(uint256 deaAmount, uint256 usdcAmount) = uniswapRouter.removeLiquidity(address(dea), address(usdc), (sUniDUAmount/DUVaultRatio), 1, 1, address(this), block.timestamp + 1 days);
 
 		uint256 ethAmount = uniswapRouter.swapExactTokensForETH(usdcAmount, 1, usdc2wethPath, address(this), block.timestamp + 1 days)[1];
@@ -316,16 +316,16 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 	function sUniDU2sdea(uint256 sUniDUAmount, uint256 minAmountOut) public nonReentrant() {
 		sUniDU.burn(msg.sender, sUniDUAmount);
 
-		uint256 deaAmount = uniDU2sdea(sUniDUAmount * DURatio / scale);
+		uint256 deaAmount = uniDU2dea(sUniDUAmount * DURatio / scale);
 
 		require(deaAmount >= minAmountOut, "INSUFFICIENT_OUTPUT_AMOUNT");
-		sdeaVault.lockFor(deaAmount, address(this));
+		sdeaVault.lockFor(deaAmount, msg.sender);
 		sdea.transfer(msg.sender, deaAmount);
 		
 		emit Swap(msg.sender, address(uniDU), address(sdea), sUniDUAmount, deaAmount);
 	}
 
-	function uniDE2sdea(uint256 sUniDEAmount) internal returns(uint256) {
+	function uniDE2dea(uint256 sUniDEAmount) internal returns(uint256) {
 		(uint256 deusAmount, uint256 ethAmount) = uniswapRouter.removeLiquidityETH(address(deus), sUniDEAmount, 1, 1, address(this), block.timestamp + 1 days);
 		uint256 deusAmount2 = AMM.calculatePurchaseReturn(ethAmount);
 		AMM.buy{value: ethAmount}(deusAmount2);
@@ -336,10 +336,10 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 	function sUniDE2sdea(uint256 sUniDEAmount, uint256 minAmountOut) public nonReentrant() {
 		sUniDE.burn(msg.sender, sUniDEAmount);
 
-		uint256 deaAmount = uniDE2sdea(sUniDEAmount * DERatio / scale);
+		uint256 deaAmount = uniDE2dea(sUniDEAmount * DERatio / scale);
 
 		require(deaAmount >= minAmountOut, "INSUFFICIENT_OUTPUT_AMOUNT");
-		sdeaVault.lockFor(deaAmount, address(this));
+		sdeaVault.lockFor(deaAmount, msg.sender);
 		sdea.transfer(msg.sender, deaAmount);
 
 		emit Swap(msg.sender, address(uniDE), address(sdea), sUniDEAmount, deaAmount);
