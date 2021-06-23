@@ -121,6 +121,8 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		address _amm,
 		address _sdeaVault
 	) ReentrancyGuard() {
+	    _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+	    _setupRole(OPERATOR_ROLE, msg.sender);
 		uniswapRouter = IUniswapV2Router02(_uniswapRouter);
 		bpt = IBPool(_bpt);
 		AMM = AutomaticMarketMaker(_amm);
