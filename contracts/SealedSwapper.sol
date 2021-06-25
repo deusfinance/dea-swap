@@ -290,50 +290,9 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		sdeaVault.lockFor(deaAmount, address(this));
 		IERC20(sdea).transfer(msg.sender, deaAmount + sdeaAmount);
 
-		emit Swap(msg.sender, address(bpt), sdea, poolAmountIn, deaAmount);
+		emit Swap(msg.sender, address(bpt), sdea, poolAmountIn, deaAmount + sdeaAmount);
 	}
 
-	function minAmountCaculator(address pair, uint amount) public view returns(uint, uint) {
-		(uint reserve1, uint reserve2, ) = IUniswapV2Pair(uniDD).getReserves();
-		uint totalSupply = IERC20(pair).totalSupply();
-		return (amount * reserve1 / totalSupply, amount * reserve2 / totalSupply);
-	}
-
-	function getBpt2SDeaAmount(uint poolAmountIn) public view returns(uint[6] memory, uint) {
-		uint256 deaAmount = calcExitAmount(dea, poolAmountIn);
-		uint256 sUniDDAmount = calcExitAmount(sUniDD, poolAmountIn);
-		uint256 sUniDUAmount = calcExitAmount(sUniDU, poolAmountIn);
-		uint256 sUniDEAmount = calcExitAmount(sUniDE, poolAmountIn);
-		uint256 sdeaAmount = calcExitAmount(sdea, poolAmountIn);
-		uint256 sdeusAmount = calcExitAmount(sdeus, poolAmountIn);
-
-		sdeaAmount += deaAmount;
-		sdeaAmount += getSUniDD2SDeaAmount(sUniDDAmount);
-		sdeaAmount += getSUniDU2SDeaAmount(sUniDUAmount);
-		sdeaAmount += getSUniDE2SDeaAmount(sUniDEAmount);
-		sdeaAmount += uniswapRouter.getAmountsOut(sdeusAmount * deusRatio / scale, deus2deaPath)[1];
-
-		return ([deaAmount, sUniDDAmount, sUniDUAmount, sUniDEAmount, sdeaAmount, sdeusAmount], sdeaAmount);
-	}
-	function getSUniDU2SDeaAmount(uint amountIn) public view returns(uint) {
-		(uint deaAmount, uint usdcAmount) = minAmountCaculator(uniDU, (amountIn * DUVaultRatio / scale));
-		uint ethAmount = uniswapRouter.getAmountsOut(usdcAmount, usdc2wethPath)[1];
-		uint deusAmount = AMM.calculatePurchaseReturn(ethAmount);
-		uint deaAmount2 = uniswapRouter.getAmountsOut(deusAmount, deus2deaPath)[1];
-		return (deaAmount + deaAmount2) * DURatio / scale;
-	}
-
-	function getSUniDD2SDeaAmount(uint amountIn) public view returns(uint) {
-		(uint deusAmount, uint deaAmount) = minAmountCaculator(uniDD, amountIn);
-		uint deaAmount2 = uniswapRouter.getAmountsOut(deusAmount, deus2deaPath)[1];
-		return (deaAmount + deaAmount2) * DDRatio / scale;
-	}
-	function getSUniDE2SDeaAmount(uint amountIn) public view returns(uint) {
-		(uint deusAmount, uint ethAmount) = minAmountCaculator(uniDE, amountIn);
-		uint deusAmount2 = AMM.calculatePurchaseReturn(ethAmount);
-		uint deaAmount = uniswapRouter.getAmountsOut(deusAmount + deusAmount2, deus2deaPath)[1];
-		return deaAmount * DERatio / scale;
-	}
 
 
 	function uniDD2dea(uint256 sUniDDAmount) internal returns(uint256) {
@@ -413,7 +372,52 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		require(hasRole(TRUSTY_ROLE, msg.sender), "SEALED_SWAPPER: Caller is not a TRUSTY");
 		to.transfer(amount);
 	}
+	
 	receive() external payable {}
+	
+	//--------- View functions --------- //
+
+	function minAmountCaculator(address pair, uint amount) public view returns(uint, uint) {
+		(uint reserve1, uint reserve2, ) = IUniswapV2Pair(uniDD).getReserves();
+		uint totalSupply = IERC20(pair).totalSupply();
+		return (amount * reserve1 / totalSupply, amount * reserve2 / totalSupply);
+	}
+
+	function getBpt2SDeaAmount(uint poolAmountIn) public view returns(uint[6] memory, uint) {
+		uint256 deaAmount = calcExitAmount(dea, poolAmountIn);
+		uint256 sUniDDAmount = calcExitAmount(sUniDD, poolAmountIn);
+		uint256 sUniDUAmount = calcExitAmount(sUniDU, poolAmountIn);
+		uint256 sUniDEAmount = calcExitAmount(sUniDE, poolAmountIn);
+		uint256 sdeaAmount = calcExitAmount(sdea, poolAmountIn);
+		uint256 sdeusAmount = calcExitAmount(sdeus, poolAmountIn);
+
+		sdeaAmount += deaAmount;
+		sdeaAmount += getSUniDD2SDeaAmount(sUniDDAmount);
+		sdeaAmount += getSUniDU2SDeaAmount(sUniDUAmount);
+		sdeaAmount += getSUniDE2SDeaAmount(sUniDEAmount);
+		sdeaAmount += uniswapRouter.getAmountsOut(sdeusAmount * deusRatio / scale, deus2deaPath)[1];
+
+		return ([deaAmount, sUniDDAmount, sUniDUAmount, sUniDEAmount, sdeaAmount, sdeusAmount], sdeaAmount);
+	}
+	function getSUniDU2SDeaAmount(uint amountIn) public view returns(uint) {
+		(uint deaAmount, uint usdcAmount) = minAmountCaculator(uniDU, (amountIn * DUVaultRatio / scale));
+		uint ethAmount = uniswapRouter.getAmountsOut(usdcAmount, usdc2wethPath)[1];
+		uint deusAmount = AMM.calculatePurchaseReturn(ethAmount);
+		uint deaAmount2 = uniswapRouter.getAmountsOut(deusAmount, deus2deaPath)[1];
+		return (deaAmount + deaAmount2) * DURatio / scale;
+	}
+
+	function getSUniDD2SDeaAmount(uint amountIn) public view returns(uint) {
+		(uint deusAmount, uint deaAmount) = minAmountCaculator(uniDD, amountIn);
+		uint deaAmount2 = uniswapRouter.getAmountsOut(deusAmount, deus2deaPath)[1];
+		return (deaAmount + deaAmount2) * DDRatio / scale;
+	}
+	function getSUniDE2SDeaAmount(uint amountIn) public view returns(uint) {
+		(uint deusAmount, uint ethAmount) = minAmountCaculator(uniDE, amountIn);
+		uint deusAmount2 = AMM.calculatePurchaseReturn(ethAmount);
+		uint deaAmount = uniswapRouter.getAmountsOut(deusAmount + deusAmount2, deus2deaPath)[1];
+		return deaAmount * DERatio / scale;
+	}
 }
 
 // Dar panahe Khoda
