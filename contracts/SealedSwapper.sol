@@ -378,7 +378,7 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 	//--------- View functions --------- //
 
 	function minAmountCaculator(address pair, uint amount) public view returns(uint, uint) {
-		(uint reserve1, uint reserve2, ) = IUniswapV2Pair(uniDD).getReserves();
+		(uint reserve1, uint reserve2, ) = IUniswapV2Pair(pair).getReserves();
 		uint totalSupply = IERC20(pair).totalSupply();
 		return (amount * reserve1 / totalSupply, amount * reserve2 / totalSupply);
 	}
@@ -407,11 +407,20 @@ contract SealedSwapper is AccessControl, ReentrancyGuard {
 		return (deaAmount + deaAmount2) * DURatio / scale;
 	}
 
+	function uniPairGetAmountOut(uint amountIn, uint reserveIn, uint reserveOut) internal pure returns (uint amountOut) {
+        uint amountInWithFee = amountIn * 997;
+        uint numerator = amountInWithFee * reserveOut;
+        uint denominator = reserveIn * 1000 + amountInWithFee;
+        amountOut = numerator / denominator;
+    }
+
 	function getSUniDD2SDeaAmount(uint amountIn) public view returns(uint) {
+		(uint deusReserve, uint deaReserve, ) = IUniswapV2Pair(uniDD).getReserves();
 		(uint deusAmount, uint deaAmount) = minAmountCaculator(uniDD, amountIn);
-		uint deaAmount2 = uniswapRouter.getAmountsOut(deusAmount, deus2deaPath)[1];
+		uint deaAmount2 = uniPairGetAmountOut(deusAmount, deusReserve - deusAmount, deaReserve - deaAmount);
 		return (deaAmount + deaAmount2) * DDRatio / scale;
 	}
+	
 	function getSUniDE2SDeaAmount(uint amountIn) public view returns(uint) {
 		(uint deusAmount, uint ethAmount) = minAmountCaculator(uniDE, amountIn);
 		uint deusAmount2 = AMM.calculatePurchaseReturn(ethAmount);
