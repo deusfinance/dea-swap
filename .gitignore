@@ -3,3 +3,5 @@ node_modules
 #Hardhat files
 cache
 artifacts
+contracts/GetAmountOut.sol
+contracts/TestUniDDView.sol
